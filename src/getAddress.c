@@ -25,9 +25,8 @@ static const bagl_element_t ui_getAddress_compare[] = {
     UI_ICON_LEFT(0x01, BAGL_GLYPH_ICON_LEFT),
     UI_ICON_RIGHT(0x02, BAGL_GLYPH_ICON_RIGHT),
 
-    UI_TEXT(0x00, 0, 12, 128, "Compare addresses:"),
+    UI_TEXT(0x00, 0, 12, 128, "Address:"),
     UI_TEXT(0x00, 0, 26, 128, global.getAddressContext.partialAddress),
-    //UI_TEXT(0x00, 0, 26, 128, "testete11"),
 };
 
 // Preprocessor for this screen. Hides left or right arrows depending on the
