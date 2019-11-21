@@ -5,6 +5,26 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+typedef struct {
+    // public key index for the address
+    uint32_t keyIndex;
+    // base-58 address
+    uint8_t b58_address[34];
+    // the starting index to be shown
+    uint8_t displayIndex;
+    // NULL-terminated string for display
+    uint8_t partialAddress[13];
+} getAddressContext_t;
+
+// TODO not useful using union now but it will be when we add signTx command
+// To save memory, we store all the context types in a single global union,
+// taking advantage of the fact that only one command is executed at a time.
+typedef union {
+    getAddressContext_t getAddressContext;
+    //calcTxnHashContext_t calcTxnHashContext;
+} commandContext;
+extern commandContext global;
+
 // ux is a magic global variable implicitly referenced by the UX_ macros. Apps
 // should never need to reference it directly.
 extern ux_state_t ux;

@@ -40,8 +40,11 @@ static unsigned int ui_getXPub_approve_button(unsigned int button_mask, unsigned
     cx_ecfp_private_key_t private_key;
     unsigned char chain_code[32];
     unsigned char hash_160[20];
+
     // bip32 path for 44'/280'/0'/0
-    uint32_t path[] = {44 | 0x80000000, 280 | 0x80000000, 0 | 0x80000000, 0};
+    uint32_t path[4];
+    memcpy(path, htr_bip44, 3*sizeof(uint32_t));
+    path[3] = 0;
 
     switch (button_mask) {
     case BUTTON_EVT_RELEASED | BUTTON_LEFT: // REJECT
