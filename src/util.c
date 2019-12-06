@@ -46,7 +46,7 @@ int bin2dec(uint8_t *dst, uint64_t n) {
     return len;
 }
 
-int encode_base58(const unsigned char *in, size_t inlen, unsigned char *out, size_t outlen) {
+int encode_base58(const unsigned char *in, size_t inlen, char *out, size_t outlen) {
     unsigned char buffer[B58_MAX_INPUT_SIZE * 138 / 100 + 1] = {0};
     size_t i = 0, j;
     size_t startAt, stopAt;

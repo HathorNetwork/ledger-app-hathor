@@ -152,15 +152,16 @@ void print_output(tx_output_t output, uint8_t index) {
 }
 
 void print_tx(transaction_t transaction) {
-    PRINTF("\n\n-------- TRANSACTION --------\n");
+    PRINTF("\n-------- TRANSACTION --------\n");
     PRINTF("version: %u\n", transaction.version);
     PRINTF("tokens_len: %u\n", transaction.tokens_len);
     PRINTF("inputs_len: %u\n", transaction.inputs_len);
     PRINTF("outputs_len: %u\n", transaction.outputs_len);
-    for (int i = 0; i < transaction.inputs_len; i++) {
+    uint8_t i = 0;
+    for (i = 0; i < transaction.inputs_len; i++) {
         print_input(transaction.inputs[i], i);
     }
-    for (int i = 0; i < transaction.outputs_len; i++) {
+    for (i = 0; i < transaction.outputs_len; i++) {
         print_output(transaction.outputs[i], i);
     }
     PRINTF("-----------------------------\n");

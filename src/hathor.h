@@ -136,13 +136,38 @@ void pubkey_hash_to_address(uint8_t *public_key_hash, uint8_t *out);
  */
 void pubkey_to_address(cx_ecfp_public_key_t *public_key, uint8_t *out);
 
-//TODO docstrings
+/**
+ * Inititalizes a transaction struct, which basically sets some of its
+ * values to 0.
+ *
+ * @param [out] transaction
+ *   transaction struct to be initialized.
+ *
+ */
 void init_tx(transaction_t *transaction);
 
+/*
+ * Assemble a transaction object from a sequence of bytes.
+ *
+ * @param  [in] in
+ *   Input data.
+ *
+ * @param  [in] inlen
+ *   Length of the input data.
+ *
+ * @param [out] transaction
+ *   Transaction object with the information parsed from the data.
+ *
+ */
 uint8_t* parse_tx(uint8_t *in, size_t inlen, transaction_t *transaction);
 
-void print_input(tx_input_t input, uint8_t index);
-
+/**
+ * Print basic information about a transaction. Used for debugging.
+ *
+ * @param  [in] transaction
+ *   Transaction to be displayed.
+ *
+ */
 void print_tx(transaction_t transaction);
 
 /**
