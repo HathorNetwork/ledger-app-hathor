@@ -11,6 +11,7 @@
 #include <os_io_seproxyhal.h>
 #include <string.h>
 #include "hathor.h"
+#include "util.h"
 #include "ux.h"
 
 static get_address_context_t *ctx = &global.get_address_context;

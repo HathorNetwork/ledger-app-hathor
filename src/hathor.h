@@ -12,10 +12,6 @@
 #define SW_USER_REJECTED 0x6985
 #define SW_OK            0x9000
 
-// macros for converting raw bytes to uint64_t
-#define U8BE(buf, off) (((uint64_t)(U4BE(buf, off))     << 32) | ((uint64_t)(U4BE(buf, off + 4)) & 0xFFFFFFFF))
-#define U8LE(buf, off) (((uint64_t)(U4LE(buf, off + 4)) << 32) | ((uint64_t)(U4LE(buf, off))     & 0xFFFFFFFF))
-
 /**
  * All keys that we derive start with path 44'/280'/0'.
  *
@@ -48,35 +44,6 @@ typedef struct {
     uint8_t outputs_len;
     tx_output_t outputs[10];
 } transaction_t;
-
-/**
- * Converts a binary to hexadecimal string and appends a final NULL byte.
- *
- * @param  [in] data
- *   The binary data.
- *
- * @param  [in] inlen
- *   Length of input data.
- *
- * @param [out] dst
- *   Array to store the string.
- *
- */
-void bin2hex(uint8_t *dst, uint8_t *data, uint64_t inlen);
-
-/**
- * Converts an unsigned integer to a decimal string and appends a final NULL
- * byte. It returns the length of the string.
- *
- * @param  [in] n
- *   Unsigned integer to be converted.
- *
- * @param [out] dst
- *   Array to store the string.
- *
- * @return length of destination string
- */
-int bin2dec(uint8_t *dst, uint64_t n);
 
 /**
  * Get the private/public keys and chain code for the desired path.
@@ -146,26 +113,6 @@ void hash160(unsigned char *in, size_t inlen, unsigned char *out);
 void compress_public_key(unsigned char *value);
 
 /**
- * Encodes in base58.
- *
- * @param  [in] in
- *   Input data to be encoded.
- *
- * @param  [in] inlen
- *   Length of input data.
- *
- * @param [out] out
- *   Base58 of input data
- *
- * @param [in] outlen
- *   Size of the output buffer. If it's not enough to hold the encoded
- *   data, will return error (-1).
- *
- * @return the length of the base58 encoded data or -1 if there's an error
- */
-int encode_base58(const unsigned char *in, size_t inlen, unsigned char *out, size_t outlen);
-
-/**
  * Derives the address (as bytes, not base58) from a public key hash.
  *
  * @param  [in] public_key_hash
@@ -197,3 +144,18 @@ uint8_t* parse_tx(uint8_t *in, size_t inlen, transaction_t *transaction);
 void print_input(tx_input_t input, uint8_t index);
 
 void print_tx(transaction_t transaction);
+
+/**
+ * Returns the NULL-terminated string representation of an integer value,
+ * with 2 decimal places and comma separator. Eg:
+ *   1000 -> "10.00"
+ *   5000000 -> "50,000.00"
+ *
+ * @param  [in] value
+ *   Value to be converted.
+ *
+ * @param [out] out
+ *   String representation of the value.
+ *
+ */
+void format_value(int value, char *out);

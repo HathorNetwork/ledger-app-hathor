@@ -11,61 +11,10 @@
 #include <os_io_seproxyhal.h>
 #include <string.h>
 #include "hathor.h"
+#include "util.h"
 #include "ux.h"
 
 static sign_tx_context_t *ctx = &global.sign_tx_context;
-
-static char* itoa(int value, char* result, int base) {
-    // check that the base if valid
-    if (base < 2 || base > 36) { *result = '\0'; return result; }
-
-    char* ptr = result, *ptr1 = result, tmp_char;
-    int tmp_value;
-
-    do {
-        tmp_value = value;
-        value /= base;
-        *ptr++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz" [35 + (tmp_value - value * base)];
-    } while ( value );
-
-    // Apply negative sign
-    if (tmp_value < 0) *ptr++ = '-';
-    *ptr-- = '\0';
-    while(ptr1 < ptr) {
-        tmp_char = *ptr;
-        *ptr--= *ptr1;
-        *ptr1++ = tmp_char;
-    }
-    return result;
-}
-
-void format_value(int value, char *out) {
-    // first deal with the part to the left of the decimal separator
-    int tmp = value / 100;
-    int c;
-    char buf[20];
-    char *p;
-
-    itoa(tmp, buf, 10);
-    c = 2 - strlen(buf) % 3;
-    for (p = buf; *p != 0; p++) {
-       *out++ = *p;
-       if (c == 1) {
-           *out++ = ',';
-       }
-       c = (c + 1) % 3;
-    }
-    *--out = 0;
-
-    // now the part to the right
-    tmp = value % 100;
-    int len = strlen(out);
-    out[len++] = '.';
-    if (tmp < 10) {
-        out[len++] = '0';
-    }
-    itoa(tmp, out + len, 10);
-}
 
 /*
  * Prepare the output information that will be displayed.
