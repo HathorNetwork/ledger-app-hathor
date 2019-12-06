@@ -176,6 +176,10 @@ static void hathor_main(void) {
                 // convert it to a proper error code. I'm not totally sure why
                 // this is done; perhaps to handle single-byte exception
                 // codes?
+
+                // clear the global state so next requests are not impacted
+                os_memset(&global, 0, sizeof(global));
+
                 switch (e & 0xF000) {
                 case 0x6000:
                 case 0x9000:

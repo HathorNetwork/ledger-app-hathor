@@ -83,26 +83,67 @@ void init_tx(transaction_t *tx) {
     tx->outputs_len = 0;
 }
 
-/*
-void parse_input(uint8_t *buf, tx_input_t *input) {
-    PRINTF("parse_input start buf %p\n", buf);
-    os_memcpy(input->tx_id, buf, 32);
-    (*buf) += 32;
-    input->index = *buf;
-    PRINTF("index: %u\n", *buf);
-    (*buf)++;
-    uint16_t data_len = U2BE(buf, 0);
-    (*buf) += 2;
-    // ignore input data
-    (*buf) += data_len;
-    PRINTF("parse_input end buf %p\n", buf);
+void assert_length(size_t smaller, size_t larger) {
+    if (smaller > larger) {
+        THROW(SW_INVALID_PARAM);
+    }
 }
-*/
 
-// return >0 if error, else return 0
-uint8_t* parse_tx(uint8_t *in, size_t inlen, transaction_t *transaction) {
-    // TODO always check for buffer overflow
+/**
+ * Parses a tx input from the input data. Returns a pointer to the end of parsed data.
+ */
+uint8_t* parse_input(uint8_t *in, size_t inlen, tx_input_t *input) {
     uint8_t *buf = in;
+    assert_length(35, inlen);   // tx_id (32 bytes) + index (1 byte) + data_len (2 bytes)
+    os_memcpy(input->tx_id, buf, 32);
+    buf += 32;
+    input->index = *buf;
+    buf++;
+    uint16_t data_len = U2BE(buf, 0);
+    buf += 2;
+    assert_length(data_len, inlen - 35);
+    // ignore input data for now
+    buf += data_len;
+    return buf;
+}
+
+/**
+ * Validates that a script has the format of P2PKH. Throws an exception if doesn't.
+ * P2PKH scripts have the format:
+ *   [OP_DUP, OP_HASH160, pubkey_hash_len, pubkey_hash, OP_EQUALVERIFY, OP_CHECKSIG]
+ * Considering that pubkey hashes have 20 bytes and the values of the opcodes:
+ *   [0x76, 0xA9, 20, pubkey_hash, 0x88, 0xAC]
+ */
+void validate_p2pkh_script(uint8_t *in) {
+    uint8_t p2pkh[] = {0x76, 0xA9, 20, 0x88, 0xAC};
+    if (os_memcmp(p2pkh, in, 3) != 0 || os_memcmp(p2pkh + 3, in + 23, 2) !=0) {
+        THROW(SW_INVALID_PARAM);
+    }
+}
+/**
+ * Parses a tx output from the input data. Returns a pointer to the end of parsed data.
+ */
+uint8_t* parse_output(uint8_t *in, size_t inlen, tx_output_t *output) {
+    uint8_t *buf = in;
+    assert_length(7, inlen);    // value + token_data + script_len
+    //TODO consider 8-bit values
+    output->value = U4BE(buf, 0);
+    buf += 4;
+    output->token_data = *buf;
+    buf++;
+    uint16_t script_len = U2BE(buf, 0);
+    buf += 2;
+    assert_length(script_len, inlen - 7);
+    //XXX considering only p2pkh, without timelock
+    validate_p2pkh_script(buf);
+    os_memcpy(output->pubkey_hash, buf+3, 20);
+    buf += script_len;
+    return buf;
+}
+
+uint8_t* parse_tx(uint8_t *in, size_t inlen, transaction_t *transaction) {
+    uint8_t *buf = in;
+    assert_length(5, inlen);    // version + tokens_len + inputs_len + outputs_len
     transaction->version = U2BE(buf, 0);
     buf += 2;
     transaction->tokens_len = *buf;
@@ -111,34 +152,16 @@ uint8_t* parse_tx(uint8_t *in, size_t inlen, transaction_t *transaction) {
     buf++;
     transaction->outputs_len = *buf;
     buf++;
-    // TODO considering only hathors now, invalid with more tokens
     // skip reading tokens
+    assert_length(32*transaction->tokens_len, inlen - 5);
     buf += 32*transaction->tokens_len;
     // read inputs
     for (int i = 0; i < transaction->inputs_len; i++) {
-        //TODO refactor function
-        //parse_input(buf, &(transaction->inputs[i]));
-        os_memcpy(transaction->inputs[i].tx_id, buf, 32);
-        buf += 32;
-        transaction->inputs[i].index = *buf;
-        buf++;
-        uint16_t data_len = U2BE(buf, 0);
-        buf += 2;
-        // ignore input data
-        buf += data_len;
+        buf = parse_input(buf, (in + inlen - buf), &(transaction->inputs[i]));
     }
 
     for (int i = 0; i < transaction->outputs_len; i++) {
-        //TODO refactor function
-        transaction->outputs[i].value = U4BE(buf, 0);
-        buf += 4;
-        transaction->outputs[i].token_data = *buf;
-        buf++;
-        uint16_t script_len = U2BE(buf, 0);
-        buf += 2;
-        //TODO considering only p2pkh, without timelock
-        os_memcpy(transaction->outputs[i].pubkey_hash, buf+3, 20);
-        buf += script_len;
+        buf = parse_output(buf, (in + inlen - buf), &(transaction->outputs[i]));
     }
     return buf;
 }

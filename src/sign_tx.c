@@ -278,6 +278,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
         if (p2 == 0) {
             // end of data, parse it
             uint8_t *buf = ctx->buffer;
+            //TODO check buffer overflow
             // check output change. If next byte is greater than 0, there's a change output
             ctx->has_change_output = (*buf > 0 ? true : false);
             buf++;
@@ -289,7 +290,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
                 PRINTF("change out index %u - key index %u", ctx->change_output_index, ctx->change_key_index);
             }
 
-            uint8_t *ret = parse_tx(buf, 0, &ctx->transaction);
+            uint8_t *ret = parse_tx(buf, (ctx->buffer + ctx->buffer_len - buf), &ctx->transaction);
             print_tx(ctx->transaction);
 
             if (ret - ctx->buffer != ctx->buffer_len) {

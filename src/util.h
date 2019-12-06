@@ -56,7 +56,7 @@ int bin2dec(uint8_t *dst, uint64_t n);
  *
  * @return the length of the base58 encoded data or -1 if there's an error
  */
-int encode_base58(const unsigned char *in, size_t inlen, unsigned char *out, size_t outlen);
+int encode_base58(const unsigned char *in, size_t inlen, char *out, size_t outlen);
 
 /**
  * Returns the string representation of a integer.
