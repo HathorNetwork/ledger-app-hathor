@@ -278,11 +278,12 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
         if (p2 == 0) {
             // end of data, parse it
             uint8_t *buf = ctx->buffer;
-            //TODO check buffer overflow
+            assert_length(1, ctx->buffer_len);
             // check output change. If next byte is greater than 0, there's a change output
             ctx->has_change_output = (*buf > 0 ? true : false);
             buf++;
             if (ctx->has_change_output) {
+                assert_length(5, ctx->buffer_len - 1);
                 ctx->change_output_index = *buf;
                 buf++;
                 ctx->change_key_index = U4BE(buf, 0);
@@ -335,7 +336,6 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
             itoa(ctx->current_output, ctx->line1 + 8, 10);
             os_memmove(ctx->line2, ctx->info+ctx->display_index, 12);
             ctx->line2[12] = '\0';
-            PRINTF("full str %s", ctx->info);
 
             UX_DISPLAY(ui_sign_tx_compare, ui_prepro_sign_tx_compare);
             *flags |= IO_ASYNCH_REPLY;

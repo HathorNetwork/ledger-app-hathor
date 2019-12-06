@@ -184,3 +184,16 @@ void print_tx(transaction_t transaction);
  *
  */
 void format_value(int value, char *out);
+
+/**
+ * Raises an exception in case the expected size is not smaller
+ * than the other.
+ *
+ * @param  [in] smaller
+ *   Value supposed to be smaller.
+ *
+ * @param  [in] larger
+ *   Value supposed to be larger.
+ *
+ */
+void assert_length(size_t smaller, size_t larger);

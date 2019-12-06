@@ -83,12 +83,6 @@ void init_tx(transaction_t *tx) {
     tx->outputs_len = 0;
 }
 
-void assert_length(size_t smaller, size_t larger) {
-    if (smaller > larger) {
-        THROW(SW_INVALID_PARAM);
-    }
-}
-
 /**
  * Parses a tx input from the input data. Returns a pointer to the end of parsed data.
  */
@@ -216,4 +210,10 @@ void format_value(int value, char *out) {
         out[len++] = '0';
     }
     itoa(tmp, out + len, 10);
+}
+
+void assert_length(size_t smaller, size_t larger) {
+    if (smaller > larger) {
+        THROW(SW_INVALID_PARAM);
+    }
 }
