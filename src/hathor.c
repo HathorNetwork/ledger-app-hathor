@@ -141,15 +141,111 @@ int encode_base58(const unsigned char *in, size_t inlen, unsigned char *out, siz
     return i;
 }
 
+void pubkey_hash_to_address(uint8_t *hash, uint8_t *out) {
+    unsigned char checksum_buffer[32];
+    // prepend version
+    out[0] = P2PKH_VERSION_BYTE;
+    os_memmove(out+1, hash, 20);
+    // sha256d of above and get first 4 bytes (checksum)
+    sha256d(out, 21, checksum_buffer);
+    os_memmove(out+21, checksum_buffer, 4);
+}
+
 void pubkey_to_address(cx_ecfp_public_key_t *public_key, uint8_t *out) {
-    unsigned char checksumBuffer[32];
+    unsigned char hash_buffer[20];
     // get compressed pubkey
     compress_public_key(public_key->W);
     // get hash160
-    hash160(public_key->W, 33, out+1);
-    // prepend version
-    out[0] = P2PKH_VERSION_BYTE;
-    // sha256d of above and get first 4 bytes (checksum)
-    sha256d(out, 21, checksumBuffer);
-    os_memmove(out+21, checksumBuffer, 4);
+    hash160(public_key->W, 33, hash_buffer);
+    pubkey_hash_to_address(hash_buffer, out);
+}
+
+void init_tx(transaction_t *tx) {
+    tx->version = 0;
+    tx->tokens_len = 0;
+    tx->inputs_len = 0;
+    tx->outputs_len = 0;
+}
+
+/*
+void parse_input(uint8_t *buf, tx_input_t *input) {
+    PRINTF("parse_input start buf %p\n", buf);
+    os_memcpy(input->tx_id, buf, 32);
+    (*buf) += 32;
+    input->index = *buf;
+    PRINTF("index: %u\n", *buf);
+    (*buf)++;
+    uint16_t data_len = U2BE(buf, 0);
+    (*buf) += 2;
+    // ignore input data
+    (*buf) += data_len;
+    PRINTF("parse_input end buf %p\n", buf);
+}
+*/
+
+// return >0 if error, else return 0
+uint8_t* parse_tx(uint8_t *in, size_t inlen, transaction_t *transaction) {
+    // TODO always check for buffer overflow
+    uint8_t *buf = in;
+    transaction->version = U2BE(buf, 0);
+    buf += 2;
+    transaction->tokens_len = *buf;
+    buf++;
+    transaction->inputs_len = *buf;
+    buf++;
+    transaction->outputs_len = *buf;
+    buf++;
+    // TODO considering only hathors now, invalid with more tokens
+    // skip reading tokens
+    buf += 32*transaction->tokens_len;
+    // read inputs
+    for (int i = 0; i < transaction->inputs_len; i++) {
+        //TODO refactor function
+        //parse_input(buf, &(transaction->inputs[i]));
+        os_memcpy(transaction->inputs[i].tx_id, buf, 32);
+        buf += 32;
+        transaction->inputs[i].index = *buf;
+        buf++;
+        uint16_t data_len = U2BE(buf, 0);
+        buf += 2;
+        // ignore input data
+        buf += data_len;
+    }
+
+    for (int i = 0; i < transaction->outputs_len; i++) {
+        //TODO refactor function
+        transaction->outputs[i].value = U4BE(buf, 0);
+        buf += 4;
+        transaction->outputs[i].token_data = *buf;
+        buf++;
+        uint16_t script_len = U2BE(buf, 0);
+        buf += 2;
+        //TODO considering only p2pkh, without timelock
+        os_memcpy(transaction->outputs[i].pubkey_hash, buf+3, 20);
+        buf += script_len;
+    }
+    return buf;
+}
+
+void print_input(tx_input_t input, uint8_t index) {
+    PRINTF("input %u: index %u\n", index, input.index);
+}
+
+void print_output(tx_output_t output, uint8_t index) {
+    PRINTF("output %u: token_data %u, value %u\n", index, output.token_data, output.value);
+}
+
+void print_tx(transaction_t transaction) {
+    PRINTF("\n\n-------- TRANSACTION --------\n");
+    PRINTF("version: %u\n", transaction.version);
+    PRINTF("tokens_len: %u\n", transaction.tokens_len);
+    PRINTF("inputs_len: %u\n", transaction.inputs_len);
+    PRINTF("outputs_len: %u\n", transaction.outputs_len);
+    for (int i = 0; i < transaction.inputs_len; i++) {
+        print_input(transaction.inputs[i], i);
+    }
+    for (int i = 0; i < transaction.outputs_len; i++) {
+        print_output(transaction.outputs[i], i);
+    }
+    PRINTF("-----------------------------\n");
 }

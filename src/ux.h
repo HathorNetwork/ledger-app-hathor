@@ -14,14 +14,36 @@ typedef struct {
     uint8_t displayIndex;
     // NULL-terminated string for display
     uint8_t partialAddress[13];
-} getAddressContext_t;
+} get_address_context_t;
 
-// TODO not useful using union now but it will be when we add signTx command
+typedef struct {
+    //TODO make enum
+    uint8_t state;      // 0 - not initialized; 1 - receiving data; 2 - user approved
+    // used for caching the bytes when receiving the tx and for sighash_all data
+    uint8_t buffer[1000];
+    // total size used in the buffer
+    uint8_t buffer_len;
+    bool has_change_output;
+    // on a given tx, which one is the change output (if exists)
+    uint8_t change_output_index;
+    // which key the change is sent to
+    uint32_t change_key_index;
+    transaction_t transaction;
+    // display variables
+    uint8_t current_output;
+    char info[60];      // address + HTR value
+    // the starting index to be shown
+    uint8_t display_index;
+    // NULL-terminated string for display
+    char line1[11];
+    char line2[13];
+} sign_tx_context_t;
+
 // To save memory, we store all the context types in a single global union,
 // taking advantage of the fact that only one command is executed at a time.
 typedef union {
-    getAddressContext_t getAddressContext;
-    //calcTxnHashContext_t calcTxnHashContext;
+    get_address_context_t get_address_context;
+    sign_tx_context_t sign_tx_context;
 } commandContext;
 extern commandContext global;
 

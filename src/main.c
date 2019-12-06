@@ -52,6 +52,8 @@ static const ux_menu_entry_t menu_main[] = {
 // ui_idle displays the main menu. Note that your app isn't required to use a
 // menu as its idle screen; you can define your own completely custom screen.
 void ui_idle(void) {
+    // reset any global state we may have
+    os_memset(&global, 0, sizeof(global));
     // The first argument is the starting index within menu_main, and the last
     // argument is a preprocessor; I've never seen an app that uses either
     // argument.
@@ -73,6 +75,7 @@ void io_exchange_with_code(uint16_t code, uint16_t tx) {
 // table of function pointers.
 #define INS_GET_VERSION     0x01
 #define INS_GET_ADDRESS     0x02
+#define INS_SIGN_TX         0x04
 #define INS_GET_XPUB        0x10
 
 // This is the function signature for a command handler. 'flags' and 'tx' are
@@ -83,12 +86,14 @@ typedef void handler_fn_t(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint16_t 
 
 handler_fn_t handleGetVersion;
 handler_fn_t handleGetAddress;
+handler_fn_t handle_sign_tx;
 handler_fn_t handleGetXPub;
 
 static handler_fn_t* lookupHandler(uint8_t ins) {
     switch (ins) {
     case INS_GET_VERSION:    return handleGetVersion;
     case INS_GET_ADDRESS:    return handleGetAddress;
+    case INS_SIGN_TX:        return handle_sign_tx;
     case INS_GET_XPUB:       return handleGetXPub;
     default:                 return NULL;
     }
@@ -116,6 +121,9 @@ static void hathor_main(void) {
     volatile unsigned int rx = 0;
     volatile unsigned int tx = 0;
     volatile unsigned int flags = 0;
+
+    // reset global state when starting
+    os_memset(&global, 0, sizeof(global));
 
     // Exchange APDUs until EXCEPTION_IO_RESET is thrown.
     for (;;) {

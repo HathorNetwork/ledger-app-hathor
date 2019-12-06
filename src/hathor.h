@@ -23,6 +23,32 @@
  */
 extern const uint32_t htr_bip44[3];
 
+typedef struct {
+    uint8_t tx_id[32];
+    uint8_t index;
+} tx_input_t;
+
+// TODO only p2pkh and HTR for now
+// TODO add timelock
+typedef struct {
+    uint32_t value;     //TODO support 64-bit values
+    // hash160 of public key
+    uint8_t token_data;
+    uint8_t pubkey_hash[20];
+    //uint16_t script_len;
+    //uint8_t script[100];
+} tx_output_t;
+
+typedef struct {
+    uint16_t version;
+    uint8_t tokens_len;
+    //uint32_t tokens[5];
+    uint8_t inputs_len;
+    tx_input_t inputs[10];
+    uint8_t outputs_len;
+    tx_output_t outputs[10];
+} transaction_t;
+
 /**
  * Converts a binary to hexadecimal string and appends a final NULL byte.
  *
@@ -140,6 +166,18 @@ void compress_public_key(unsigned char *value);
 int encode_base58(const unsigned char *in, size_t inlen, unsigned char *out, size_t outlen);
 
 /**
+ * Derives the address (as bytes, not base58) from a public key hash.
+ *
+ * @param  [in] public_key_hash
+ *   The public key hash.
+ *
+ * @param [out] out
+ *   Address for the given public key.
+ *
+ */
+void pubkey_hash_to_address(uint8_t *public_key_hash, uint8_t *out);
+
+/**
  * Derives the address (as bytes, not base58) from a public key.
  *
  * @param  [in] public_key
@@ -150,3 +188,12 @@ int encode_base58(const unsigned char *in, size_t inlen, unsigned char *out, siz
  *
  */
 void pubkey_to_address(cx_ecfp_public_key_t *public_key, uint8_t *out);
+
+//TODO docstrings
+void init_tx(transaction_t *transaction);
+
+uint8_t* parse_tx(uint8_t *in, size_t inlen, transaction_t *transaction);
+
+void print_input(tx_input_t input, uint8_t index);
+
+void print_tx(transaction_t transaction);

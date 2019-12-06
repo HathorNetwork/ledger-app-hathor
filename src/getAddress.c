@@ -13,7 +13,7 @@
 #include "hathor.h"
 #include "ux.h"
 
-static getAddressContext_t *ctx = &global.getAddressContext;
+static get_address_context_t *ctx = &global.get_address_context;
 
 // Define the comparison screen. This is where the user will compare the address on
 // their device to the one shown on the computer. There are lef/right buttons on the
@@ -26,7 +26,7 @@ static const bagl_element_t ui_getAddress_compare[] = {
     UI_ICON_RIGHT(0x02, BAGL_GLYPH_ICON_RIGHT),
 
     UI_TEXT(0x00, 0, 12, 128, "Address:"),
-    UI_TEXT(0x00, 0, 26, 128, global.getAddressContext.partialAddress),
+    UI_TEXT(0x00, 0, 26, 128, global.get_address_context.partialAddress),
 };
 
 // Preprocessor for this screen. Hides left or right arrows depending on the
