@@ -63,7 +63,7 @@ static uint8_t get_previous_output(uint8_t index) {
 }
 
 static const bagl_element_t* ui_prepro_sign_tx_confirm(const bagl_element_t *element) {
-    if (element->component.userid == 1 && ctx->state == 2) {
+    if (element->component.userid == 1 && ctx->state == USER_APPROVED) {
         // don't display arrows after user confirms (when processing signatures)
         return NULL;
     } else {
@@ -84,7 +84,7 @@ static const bagl_element_t ui_sign_tx_confirm[] = {
 
 // This is the button handler for the confirmation screen
 static unsigned int ui_sign_tx_confirm_button(unsigned int button_mask, unsigned int button_mask_counter) {
-    if (ctx->state == 2) {
+    if (ctx->state == USER_APPROVED) {
         // button pressed after it's been already confirmed,
         // while processing signatures. Just ignore it.
         PRINTF("\n---- after confirm\n");
@@ -102,7 +102,7 @@ static unsigned int ui_sign_tx_confirm_button(unsigned int button_mask, unsigned
 
         case BUTTON_RIGHT:
         case BUTTON_EVT_FAST | BUTTON_RIGHT: // confirm
-            ctx->state = 2;
+            ctx->state = USER_APPROVED;
             io_exchange_with_code(SW_OK, 0);
             os_memmove(ctx->line1, "Processing\0", 11);
             os_memmove(ctx->line2, "...\0", 4);
@@ -251,15 +251,15 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
     }
 
     if (p1 == 0) {
-        if (ctx->state == 2) {
+        if (ctx->state == USER_APPROVED) {
             // can't receive more data after user's approval
             THROW(SW_INVALID_PARAM);
         }
 
         // we're receiving data
-        if (ctx->state == 0) {
+        if (ctx->state == UNINITIALIZED) {
             // starting new tx; not initialized yet
-            ctx->state = 1;
+            ctx->state = RECEIVING_DATA;
             ctx->buffer_len = 0;
             ctx->has_change_output = false;
             ctx->change_output_index = 0;

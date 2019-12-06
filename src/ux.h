@@ -16,9 +16,20 @@ typedef struct {
     uint8_t partialAddress[13];
 } get_address_context_t;
 
+/**
+ * States have the following meanings:
+ * . uninitialized: signing process not strated yet;
+ * . receiving_data: already started the process and is receiving data;
+ * . user_approved: user approved sending this transaction;
+ */
+enum sign_tx_state_e {
+    UNINITIALIZED,
+    RECEIVING_DATA,
+    USER_APPROVED,
+};
+
 typedef struct {
-    //TODO make enum
-    uint8_t state;      // 0 - not initialized; 1 - receiving data; 2 - user approved
+    enum sign_tx_state_e state;
     // used for caching the bytes when receiving the tx and for sighash_all data
     uint8_t buffer[1000];
     // total size used in the buffer
