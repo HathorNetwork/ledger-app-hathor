@@ -114,15 +114,37 @@ void validate_p2pkh_script(uint8_t *in) {
         THROW(SW_INVALID_PARAM);
     }
 }
+
+/*
+ * Parses the output as either a 4 or 8-byte unsigned integer.
+ *
+ * Returns the position in buffer after parsing the value.
+ */
+uint8_t* parse_output_value(uint8_t *in, uint64_t *value) {
+    uint8_t *buf = in;
+    uint64_t tmp = 0;
+    // if first bit is 1, it's 8 bytes long. Otherwise, it's 4
+    bool flag = ((0x80 & in[0]) ? true : false);
+    if (flag) {
+        assert_length(11, inlen);    // value + token_data + script_len
+        tmp = U8BE(in, 0);
+        tmp = (-1)*tmp;
+        buf += 8;
+    } else {
+        tmp = U4BE(in, 0);
+        buf += 4;
+    }
+    os_memcpy(value, &tmp, 8);
+    return buf;
+}
+
 /**
  * Parses a tx output from the input data. Returns a pointer to the end of parsed data.
  */
 uint8_t* parse_output(uint8_t *in, size_t inlen, tx_output_t *output) {
     uint8_t *buf = in;
     assert_length(7, inlen);    // value + token_data + script_len
-    //TODO consider 8-bit values
-    output->value = U4BE(buf, 0);
-    buf += 4;
+    buf = parse_output_value(buf, &output->value);
     output->token_data = *buf;
     buf++;
     uint16_t script_len = U2BE(buf, 0);
@@ -165,7 +187,7 @@ void print_input(tx_input_t input, uint8_t index) {
 }
 
 void print_output(tx_output_t output, uint8_t index) {
-    PRINTF("output %u: token_data %u, value %u\n", index, output.token_data, output.value);
+    PRINTF("output %u: token_data %u\n", index, output.token_data);
 }
 
 void print_tx(transaction_t transaction) {
@@ -184,14 +206,14 @@ void print_tx(transaction_t transaction) {
     PRINTF("-----------------------------\n");
 }
 
-void format_value(int value, char *out) {
+void format_value(uint64_t value, char *out) {
     // first deal with the part to the left of the decimal separator
-    int tmp = value / 100;
+    uint64_t tmp = value / 100;
     int c;
-    char buf[20];
+    char buf[35];
     char *p;
 
-    itoa(tmp, buf, 10);
+    utoa(tmp, buf);
     c = 2 - strlen(buf) % 3;
     for (p = buf; *p != 0; p++) {
        *out++ = *p;
@@ -204,12 +226,12 @@ void format_value(int value, char *out) {
 
     // now the part to the right
     tmp = value % 100;
-    int len = strlen(out);
-    out[len++] = '.';
+    c = strlen(out);
+    out[c++] = '.';
     if (tmp < 10) {
-        out[len++] = '0';
+        out[c++] = '0';
     }
-    itoa(tmp, out + len, 10);
+    itoa(tmp, out + c, 10);
 }
 
 void assert_length(size_t smaller, size_t larger) {

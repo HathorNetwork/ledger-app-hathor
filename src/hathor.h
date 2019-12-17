@@ -27,12 +27,10 @@ typedef struct {
 // TODO only p2pkh and HTR for now
 // TODO add timelock
 typedef struct {
-    uint32_t value;     //TODO support 64-bit values
+    uint64_t value;
     // hash160 of public key
     uint8_t token_data;
     uint8_t pubkey_hash[20];
-    //uint16_t script_len;
-    //uint8_t script[100];
 } tx_output_t;
 
 typedef struct {
@@ -183,7 +181,7 @@ void print_tx(transaction_t transaction);
  *   String representation of the value.
  *
  */
-void format_value(int value, char *out);
+void format_value(uint64_t value, char *out);
 
 /**
  * Raises an exception in case the expected size is not smaller

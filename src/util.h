@@ -59,7 +59,16 @@ int bin2dec(uint8_t *dst, uint64_t n);
 int encode_base58(const unsigned char *in, size_t inlen, char *out, size_t outlen);
 
 /**
- * Returns the string representation of a integer.
+ * Inverts a NULL-terminated string in place.
+ *
+ * @param [in/out] str
+ *   The string to be inverted.
+ *
+ */
+void strrev(char *str);
+
+/**
+ * Returns the string representation of a signed integer.
  *
  * @param  [in] value
  *   Value to be converted.
@@ -72,3 +81,17 @@ int encode_base58(const unsigned char *in, size_t inlen, char *out, size_t outle
  *
  */
 void itoa(int value, char *result, int base);
+
+/**
+ * Returns the string representation of an unsigned integer, in base 10. It's
+ * preferable to use itoa instead of this function, unless you absolutely
+ * have to.
+ *
+ * @param  [in] value
+ *   Value to be converted, up to 64 bits.
+ *
+ * @param [out] result
+ *   String representation of the value.
+ *
+ */
+void utoa(uint64_t value, char *result);

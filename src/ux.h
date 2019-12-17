@@ -42,7 +42,7 @@ typedef struct {
     transaction_t transaction;
     // display variables
     uint8_t current_output;
-    char info[60];      // address + HTR value
+    char info[70];      // address + HTR value
     // the starting index to be shown
     uint8_t display_index;
     // NULL-terminated string for display

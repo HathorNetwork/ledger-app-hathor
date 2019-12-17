@@ -87,7 +87,6 @@ static unsigned int ui_sign_tx_confirm_button(unsigned int button_mask, unsigned
     if (ctx->state == USER_APPROVED) {
         // button pressed after it's been already confirmed,
         // while processing signatures. Just ignore it.
-        PRINTF("\n---- after confirm\n");
         return 0;
     }
 
@@ -207,10 +206,6 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
 }
 
 void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_length, volatile unsigned int *flags, volatile unsigned int *tx) {
-    PRINTF("handle sign p1 %u p2 %u ctx->state %u\n", p1, p2, ctx->state);
-    for (int i = 0; i<data_length; i++) {
-        PRINTF(" %02x", data_buffer[i]);
-    }
     cx_ecfp_public_key_t public_key;
     cx_ecfp_private_key_t private_key;
     // bip32 path for 44'/280'/0'/0/key_index
@@ -219,7 +214,6 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
 
     if (p1 == 2) {
         // all done, go back to main menu
-        PRINTF("\nDONE - go to main menu\n");
         io_exchange_with_code(SW_OK, 0);
         ui_idle();
     }
@@ -227,7 +221,6 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
     if (p1 == 1) {
         // asking for signature
         uint32_t key_index = U4BE(data_buffer, 0);
-        PRINTF("\nrequested signature for index %u\n", key_index);
 
         // bip32 path for 44'/280'/0'/0/key_index
         memcpy(path, htr_bip44, 3*sizeof(uint32_t));
@@ -241,7 +234,6 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
         unsigned int info;
         sha256d(ctx->buffer, ctx->buffer_len, hash);
         int sig_size = cx_ecdsa_sign(&private_key, CX_LAST | CX_RND_RFC6979, CX_SHA256, hash, 32, G_io_apdu_buffer, 256, &info);
-        PRINTF("signature size %d\n", sig_size);
 
         // erase sensitive data
         explicit_bzero(&private_key, sizeof(private_key));
@@ -288,15 +280,12 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
                 buf++;
                 ctx->change_key_index = U4BE(buf, 0);
                 buf += 4;
-                PRINTF("change out index %u - key index %u", ctx->change_output_index, ctx->change_key_index);
             }
 
             uint8_t *ret = parse_tx(buf, (ctx->buffer + ctx->buffer_len - buf), &ctx->transaction);
-            print_tx(ctx->transaction);
 
             if (ret - ctx->buffer != ctx->buffer_len) {
                 // we finished parsing the tx but there's extra data on the buffer
-                PRINTF("final diff %u, len %u", ret - ctx->buffer, ctx->buffer_len);
                 io_exchange_with_code(SW_DEVELOPER_ERR, 0);
                 return;
             }
@@ -323,7 +312,6 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
                 explicit_bzero(&public_key, sizeof(public_key));
                 if (os_memcmp(hash, ctx->transaction.outputs[ctx->change_output_index].pubkey_hash, 20) != 0) {
                     // not the same
-                    PRINTF("\npubkey hashes don't match\n");
                     io_exchange_with_code(SW_INVALID_PARAM, 0);
                     return;
                 }

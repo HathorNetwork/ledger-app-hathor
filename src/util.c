@@ -7,6 +7,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 #include <os.h>
 
 #define B58_MAX_INPUT_SIZE 120
@@ -95,6 +96,17 @@ int encode_base58(const unsigned char *in, size_t inlen, char *out, size_t outle
     return i;
 }
 
+void strrev(char *str) {
+    char *p1, *p2;
+
+    if (! str || ! *str) return str;
+    for (p1 = str, p2 = str + strlen(str) - 1; p2 > p1; ++p1, --p2) {
+        *p1 ^= *p2;
+        *p2 ^= *p1;
+        *p1 ^= *p2;
+    }
+}
+
 void itoa(int value, char* result, int base) {
     // check that the base if valid
     if (base < 2 || base > 36) { *result = '\0'; }
@@ -116,4 +128,16 @@ void itoa(int value, char* result, int base) {
         *ptr--= *ptr1;
         *ptr1++ = tmp_char;
     }
+}
+
+void utoa(uint64_t value, char *s) {
+    uint64_t tmp = value;
+    uint8_t idx = 0;
+    while (tmp > 0) {
+        s[idx] = (tmp % 10) + '0';
+        tmp = tmp / 10;
+        idx++;
+    }
+    s[idx] = '\0';
+    strrev(s);
 }
