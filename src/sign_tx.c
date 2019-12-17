@@ -17,18 +17,6 @@
 static sign_tx_context_t *ctx = &global.sign_tx_context;
 
 /*
- * Prepare the output information that will be displayed.
- */
-static void prepare_display_output(uint8_t index) {
-    tx_output_t output = ctx->transaction.outputs[index];
-    unsigned char address[25];
-    pubkey_hash_to_address(output.pubkey_hash, address);
-    uint8_t len = encode_base58(address, 25, ctx->info, sizeof(ctx->info));
-    os_memmove(ctx->info + len, " HTR ", 5);
-    format_value(output.value, ctx->info+len+5);
-}
-
-/*
  * Returns the first output to be display. In general, that's output 0. This is only
  * not true if output 0 is the change output. In that case, the first output to be
  * displayed is 1.
@@ -60,6 +48,29 @@ static uint8_t get_next_output(uint8_t index) {
 static uint8_t get_previous_output(uint8_t index) {
     uint8_t prev = index - 1;
     return (prev == ctx->change_output_index ? prev - 1 : prev);
+}
+
+/*
+ * Prepare the output information that will be displayed.
+ */
+static void prepare_display_output(uint8_t index) {
+    // we want a space before the address, only if it's not the first output
+    ctx->info[0] = ' ';
+    uint8_t start_pos = 1;
+    if (index == get_first_output()) {
+        start_pos = 0;
+    }
+    tx_output_t output = ctx->transaction.outputs[index];
+    unsigned char address[25];
+    pubkey_hash_to_address(output.pubkey_hash, address);
+    uint8_t len = encode_base58(address, 25, ctx->info + start_pos, sizeof(ctx->info));
+    os_memmove(ctx->info + start_pos + len, " HTR ", 5);
+    format_value(output.value, ctx->info + len + 5);
+    // add space after address, if it's not last output
+    if (index != get_last_output()) {
+        ctx->info[strlen(ctx->info) + 1] = '\0';
+        ctx->info[strlen(ctx->info)] = ' ';
+    }
 }
 
 static const bagl_element_t* ui_prepro_sign_tx_confirm(const bagl_element_t *element) {
@@ -167,7 +178,7 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
             }
 
             itoa(ctx->current_output, ctx->line1 + 8, 10);
-            os_memmove(ctx->line2, ctx->info+ctx->display_index, 12);
+            os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
             UX_REDISPLAY();
             break;
 
@@ -191,7 +202,7 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
             }
 
             itoa(ctx->current_output, ctx->line1 + 8, 10);
-            os_memmove(ctx->line2, ctx->info+ctx->display_index, 12);
+            os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
             UX_REDISPLAY();
             break;
 
@@ -322,7 +333,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
             prepare_display_output(ctx->current_output);
             os_memmove(ctx->line1, "Output #", 8);
             itoa(ctx->current_output, ctx->line1 + 8, 10);
-            os_memmove(ctx->line2, ctx->info+ctx->display_index, 12);
+            os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
             ctx->line2[12] = '\0';
 
             UX_DISPLAY(ui_sign_tx_compare, ui_prepro_sign_tx_compare);

@@ -99,7 +99,7 @@ int encode_base58(const unsigned char *in, size_t inlen, char *out, size_t outle
 void strrev(char *str) {
     char *p1, *p2;
 
-    if (! str || ! *str) return str;
+    if (! str || ! *str) return;
     for (p1 = str, p2 = str + strlen(str) - 1; p2 > p1; ++p1, --p2) {
         *p1 ^= *p2;
         *p2 ^= *p1;

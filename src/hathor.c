@@ -120,7 +120,7 @@ void validate_p2pkh_script(uint8_t *in) {
  *
  * Returns the position in buffer after parsing the value.
  */
-uint8_t* parse_output_value(uint8_t *in, uint64_t *value) {
+uint8_t* parse_output_value(uint8_t *in, size_t inlen, uint64_t *value) {
     uint8_t *buf = in;
     uint64_t tmp = 0;
     // if first bit is 1, it's 8 bytes long. Otherwise, it's 4
@@ -144,7 +144,7 @@ uint8_t* parse_output_value(uint8_t *in, uint64_t *value) {
 uint8_t* parse_output(uint8_t *in, size_t inlen, tx_output_t *output) {
     uint8_t *buf = in;
     assert_length(7, inlen);    // value + token_data + script_len
-    buf = parse_output_value(buf, &output->value);
+    buf = parse_output_value(buf, inlen, &output->value);
     output->token_data = *buf;
     buf++;
     uint16_t script_len = U2BE(buf, 0);
