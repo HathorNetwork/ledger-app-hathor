@@ -213,7 +213,7 @@ void print_tx(transaction_t transaction) {
     PRINTF("-----------------------------\n");
 }
 
-void format_value(uint64_t value, char *out) {
+void format_value(uint64_t value, unsigned char *out) {
     // first deal with the part to the left of the decimal separator
     uint64_t tmp = value / 100;
     int c;
@@ -233,12 +233,12 @@ void format_value(uint64_t value, char *out) {
 
     // now the part to the right
     tmp = value % 100;
-    c = strlen(out);
+    c = strlen((const char*)out);
     out[c++] = '.';
     if (tmp < 10) {
         out[c++] = '0';
     }
-    itoa(tmp, out + c, 10);
+    itoa(tmp, (char*)out + c, 10);
 }
 
 void assert_length(size_t smaller, size_t larger) {

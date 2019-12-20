@@ -42,7 +42,7 @@ typedef struct {
     transaction_t transaction;
     // display variables
     uint8_t current_output;
-    char info[70];      // address + HTR value
+    unsigned char info[70];      // address + HTR value
     uint8_t output_fake_index;      // see sign_tx.c to understand its usage
     // the starting index to be shown
     uint8_t display_index;

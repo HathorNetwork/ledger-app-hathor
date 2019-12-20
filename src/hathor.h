@@ -181,7 +181,7 @@ void print_tx(transaction_t transaction);
  *   String representation of the value.
  *
  */
-void format_value(uint64_t value, char *out);
+void format_value(uint64_t value, unsigned char *out);
 
 /**
  * Raises an exception in case the expected size is not smaller

@@ -135,7 +135,7 @@ static const bagl_element_t* ui_prepro_sign_tx_compare(const bagl_element_t *ele
     case 2:
         // 0x02 is the right, so return NULL if we're displaying the end of the last element.
         return ((ctx->current_output == get_last_output()
-                    && ctx->display_index == (strlen(ctx->info) - 12)) ? NULL : element);
+                    && ctx->display_index == (strlen((const char*)ctx->info) - 12)) ? NULL : element);
     default:
         // Always display all other elements.
         return element;
@@ -158,7 +158,7 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
                     // go to previous output
                     ctx->current_output = get_previous_output(ctx->current_output);
                     prepare_display_output(ctx->current_output);
-                    ctx->display_index = strlen(ctx->info) - 12;
+                    ctx->display_index = strlen((const char*)ctx->info) - 12;
                     ctx->output_fake_index--;
                     itoa(ctx->output_fake_index, ctx->line1 + 8, 10);
                 }
@@ -173,7 +173,7 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
         // scroll right by either clicking or pressing the right button
         case BUTTON_RIGHT:
         case BUTTON_EVT_FAST | BUTTON_RIGHT: // SEEK RIGHT
-            if (ctx->display_index == strlen(ctx->info) - 12) {
+            if (ctx->display_index == strlen((const char*)ctx->info) - 12) {
                 // we're at the end of one of the outputs
                 if (ctx->current_output == get_last_output()) {
                     // if it's the last one, do nothing
