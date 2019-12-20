@@ -28,6 +28,7 @@ include $(BOLOS_SDK)/Makefile.defines
 
 APPNAME    = Hathor
 ICONNAME   = nanos_app_hathor.gif
+# APPVERSION has the format "X.Y.Z", where X, Y, and Z must be a single digit between 0 and 9
 APPVERSION = 0.0.1
 
 # The --path argument here restricts which BIP32 paths the app is allowed to derive.
