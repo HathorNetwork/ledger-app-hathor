@@ -39,7 +39,7 @@ static uint8_t get_last_output() {
  */
 static uint8_t get_next_output(uint8_t index) {
     uint8_t next = index + 1;
-    return (next == ctx->change_output_index ? next + 1 : next);
+    return ((ctx->has_change_output && next == ctx->change_output_index) ? next + 1 : next);
 }
 
 /*
@@ -47,30 +47,19 @@ static uint8_t get_next_output(uint8_t index) {
  */
 static uint8_t get_previous_output(uint8_t index) {
     uint8_t prev = index - 1;
-    return (prev == ctx->change_output_index ? prev - 1 : prev);
+    return ((ctx->has_change_output && prev == ctx->change_output_index) ? prev - 1 : prev);
 }
 
 /*
  * Prepare the output information that will be displayed.
  */
 static void prepare_display_output(uint8_t index) {
-    // we want a space before the address, only if it's not the first output
-    ctx->info[0] = ' ';
-    uint8_t start_pos = 1;
-    if (index == get_first_output()) {
-        start_pos = 0;
-    }
     tx_output_t output = ctx->transaction.outputs[index];
     unsigned char address[25];
     pubkey_hash_to_address(output.pubkey_hash, address);
-    uint8_t len = encode_base58(address, 25, ctx->info + start_pos, sizeof(ctx->info));
-    os_memmove(ctx->info + start_pos + len, " HTR ", 5);
+    uint8_t len = encode_base58(address, 25, ctx->info, sizeof(ctx->info));
+    os_memmove(ctx->info + len, " HTR ", 5);
     format_value(output.value, ctx->info + len + 5);
-    // add space after address, if it's not last output
-    if (index != get_last_output()) {
-        ctx->info[strlen(ctx->info) + 1] = '\0';
-        ctx->info[strlen(ctx->info)] = ' ';
-    }
 }
 
 static const bagl_element_t* ui_prepro_sign_tx_confirm(const bagl_element_t *element) {
