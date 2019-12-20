@@ -95,9 +95,16 @@ uint8_t* parse_input(uint8_t *in, size_t inlen, tx_input_t *input) {
     buf++;
     uint16_t data_len = U2BE(buf, 0);
     buf += 2;
+    // we require the input data to be empty, as we're signing the whole
+    // bytes we get from the wallet (in sighash_all, inputs must have no data)
+    if (data_len > 0) {
+        THROW(SW_INVALID_PARAM);
+    }
+    /*
     assert_length(data_len, inlen - 35);
     // ignore input data for now
     buf += data_len;
+    */
     return buf;
 }
 

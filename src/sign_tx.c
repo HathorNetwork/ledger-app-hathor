@@ -131,11 +131,9 @@ static const bagl_element_t* ui_prepro_sign_tx_compare(const bagl_element_t *ele
     switch (element->component.userid) {
     case 1:
         // 0x01 is the left icon so return NULL if we're displaying the beginning of the first element.
-        //return (ctx->displayIndex == 0) ? NULL : element;
         return ((ctx->current_output == get_first_output() && ctx->display_index == 0) ? NULL : element);
     case 2:
         // 0x02 is the right, so return NULL if we're displaying the end of the last element.
-        //return (ctx->displayIndex == sizeof(ctx->b58_address)-12) ? NULL : element;
         return ((ctx->current_output == get_last_output()
                     && ctx->display_index == (strlen(ctx->info) - 12)) ? NULL : element);
     default:

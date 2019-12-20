@@ -31,7 +31,7 @@ enum sign_tx_state_e {
 typedef struct {
     enum sign_tx_state_e state;
     // used for caching the bytes when receiving the tx and for sighash_all data
-    uint8_t buffer[1000];
+    uint8_t buffer[700];
     // total size used in the buffer
     uint8_t buffer_len;
     bool has_change_output;
@@ -43,6 +43,7 @@ typedef struct {
     // display variables
     uint8_t current_output;
     char info[70];      // address + HTR value
+    uint8_t output_fake_index;      // see sign_tx.c to understand its usage
     // the starting index to be shown
     uint8_t display_index;
     // NULL-terminated string for display
