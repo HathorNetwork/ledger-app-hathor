@@ -153,7 +153,7 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
             if (ctx->display_index == 0) {
                 // we're at the beginning of an output
                 if (ctx->current_output == get_first_output()) {
-                    // do nothing
+                    // it's the first output, so can't scroll left
                     UX_REDISPLAY();
                     break;
                 } else {
@@ -161,12 +161,13 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
                     ctx->current_output = get_previous_output(ctx->current_output);
                     prepare_display_output(ctx->current_output);
                     ctx->display_index = strlen(ctx->info) - 12;
+                    ctx->output_fake_index--;
+                    itoa(ctx->output_fake_index, ctx->line1 + 8, 10);
                 }
             } else {
                 ctx->display_index--;
             }
 
-            itoa(ctx->current_output, ctx->line1 + 8, 10);
             os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
             UX_REDISPLAY();
             break;
@@ -185,12 +186,13 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
                     ctx->current_output = get_next_output(ctx->current_output);
                     prepare_display_output(ctx->current_output);
                     ctx->display_index = 0;
+                    ctx->output_fake_index++;
+                    itoa(ctx->output_fake_index, ctx->line1 + 8, 10);
                 }
             } else {
                 ctx->display_index++;
             }
 
-            itoa(ctx->current_output, ctx->line1 + 8, 10);
             os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
             UX_REDISPLAY();
             break;
@@ -231,9 +233,8 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
         derive_keypair(path, 5, &private_key, &public_key, NULL);
 
         // sign message (sha256d of sighash_all data)
-        unsigned int info;
         sha256d(ctx->buffer, ctx->buffer_len, hash);
-        int sig_size = cx_ecdsa_sign(&private_key, CX_LAST | CX_RND_RFC6979, CX_SHA256, hash, 32, G_io_apdu_buffer, 256, &info);
+        int sig_size = cx_ecdsa_sign(&private_key, CX_LAST | CX_RND_RFC6979, CX_SHA256, hash, 32, G_io_apdu_buffer, 256, NULL);
 
         // erase sensitive data
         explicit_bzero(&private_key, sizeof(private_key));
@@ -321,7 +322,11 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
             ctx->current_output = get_first_output();
             prepare_display_output(ctx->current_output);
             os_memmove(ctx->line1, "Output #", 8);
-            itoa(ctx->current_output, ctx->line1 + 8, 10);
+            // we use this "fake index" to always show consecutive output numbers to the
+            // user. As the change output is not always the last and we never display it,
+            // we coould skip one number when displaying the outputs to the user.
+            ctx->output_fake_index = 0;
+            itoa(ctx->output_fake_index, ctx->line1 + 8, 10);
             os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
             ctx->line2[12] = '\0';
 
