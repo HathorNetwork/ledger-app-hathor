@@ -17,6 +17,29 @@
 static sign_tx_context_t *ctx = &global.sign_tx_context;
 
 /*
+ * Parses the change output info and returns its size. The first byte indicates
+ * whether there's change or not (no change output if byte=0x00). There are 2
+ * possible return values:
+ *   . 1: if there's no change output, it's only 1 byte;
+ *   . 6: if there is, it's [change_exists (1 byte) + output_index (1 byte) + key_index (4 bytes)]
+ */
+static uint8_t parse_change_output_info(uint8_t *in, size_t inlen) {
+    uint8_t *buf = in;
+    assert_length(1, inlen);
+    // check output change. If next byte is greater than 0, there's a change output
+    ctx->has_change_output = (*buf > 0 ? true : false);
+    buf++;
+    if (ctx->has_change_output) {
+        assert_length(5, inlen - 1);
+        ctx->change_output_index = *buf;
+        buf++;
+        ctx->change_key_index = U4BE(buf, 0);
+        buf += 4;
+    }
+    return buf - in;
+}
+
+/*
  * Returns the first output to be display. In general, that's output 0. This is only
  * not true if output 0 is the change output. In that case, the first output to be
  * displayed is 1.
@@ -242,12 +265,15 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
     }
 
     if (p1 == 0) {
+        PRINTF("got data to sign\n");
+        // we're receiving transaction data
+        uint8_t change_output_info_len = 0;
         if (ctx->state == USER_APPROVED) {
             // can't receive more data after user's approval
+            PRINTF("user already approved\n");
             THROW(SW_INVALID_PARAM);
         }
 
-        // we're receiving data
         if (ctx->state == UNINITIALIZED) {
             // starting new tx; not initialized yet
             ctx->state = RECEIVING_DATA;
@@ -258,30 +284,22 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
             ctx->current_output = 0;
             ctx->display_index = 0;
             init_tx(&ctx->transaction);
+            // the first chunk of data has the change output info
+            change_output_info_len = parse_change_output_info(data_buffer, data_length);
         }
 
         if (p2 >= 0) {
-            //receiving data
-            os_memcpy(ctx->buffer + ctx->buffer_len, data_buffer, data_length);
-            ctx->buffer_len += data_length;
+            // Receiving data. Skipe the change output info if this is the first chunk
+            os_memcpy(ctx->buffer + ctx->buffer_len, data_buffer + change_output_info_len, data_length - change_output_info_len);
+            ctx->buffer_len += (data_length - change_output_info_len);
         }
 
         if (p2 == 0) {
             // end of data, parse it
-            uint8_t *buf = ctx->buffer;
-            assert_length(1, ctx->buffer_len);
-            // check output change. If next byte is greater than 0, there's a change output
-            ctx->has_change_output = (*buf > 0 ? true : false);
-            buf++;
-            if (ctx->has_change_output) {
-                assert_length(5, ctx->buffer_len - 1);
-                ctx->change_output_index = *buf;
-                buf++;
-                ctx->change_key_index = U4BE(buf, 0);
-                buf += 4;
-            }
-
-            uint8_t *ret = parse_tx(buf, (ctx->buffer + ctx->buffer_len - buf), &ctx->transaction);
+            PRINTF("buffer len %d\n", ctx->buffer_len);
+            PRINTF("to sign:\n %.*H \n\n", ctx->buffer_len, ctx->buffer);
+            PRINTF("-------\n\n");
+            uint8_t *ret = parse_tx(ctx->buffer, ctx->buffer_len, &ctx->transaction);
 
             if (ret - ctx->buffer != ctx->buffer_len) {
                 // we finished parsing the tx but there's extra data on the buffer
@@ -291,6 +309,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
 
             // check if change output is within existing outputs
             if (ctx->change_output_index >= ctx->transaction.outputs_len) {
+                PRINTF("change index > outputs len\n");
                 io_exchange_with_code(SW_INVALID_PARAM, 0);
                 return;
             }
@@ -311,6 +330,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
                 explicit_bzero(&public_key, sizeof(public_key));
                 if (os_memcmp(hash, ctx->transaction.outputs[ctx->change_output_index].pubkey_hash, 20) != 0) {
                     // not the same
+                    PRINTF("not the same output\n");
                     io_exchange_with_code(SW_INVALID_PARAM, 0);
                     return;
                 }
