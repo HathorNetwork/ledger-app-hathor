@@ -265,7 +265,6 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
     }
 
     if (p1 == 0) {
-        PRINTF("got data to sign\n");
         // we're receiving transaction data
         uint8_t change_output_info_len = 0;
         if (ctx->state == USER_APPROVED) {
@@ -296,9 +295,6 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
 
         if (p2 == 0) {
             // end of data, parse it
-            PRINTF("buffer len %d\n", ctx->buffer_len);
-            PRINTF("to sign:\n %.*H \n\n", ctx->buffer_len, ctx->buffer);
-            PRINTF("-------\n\n");
             uint8_t *ret = parse_tx(ctx->buffer, ctx->buffer_len, &ctx->transaction);
 
             if (ret - ctx->buffer != ctx->buffer_len) {
@@ -330,7 +326,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
                 explicit_bzero(&public_key, sizeof(public_key));
                 if (os_memcmp(hash, ctx->transaction.outputs[ctx->change_output_index].pubkey_hash, 20) != 0) {
                     // not the same
-                    PRINTF("not the same output\n");
+                    PRINTF("change output pubkey hash does not match given index\n");
                     io_exchange_with_code(SW_INVALID_PARAM, 0);
                     return;
                 }
