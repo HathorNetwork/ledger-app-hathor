@@ -15,6 +15,9 @@
 // handleGetVersion is the entry point for the getVersion command. It
 // unconditionally sends the app version.
 void handleGetVersion(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint16_t dataLength, volatile unsigned int *flags, volatile unsigned int *tx) {
+    // We return HTR before the app version, so our wallet can identify it's talking
+    // to the Hathor app. Otherwise, we could be making this request for another app
+    // and would also get a version from it.
 	G_io_apdu_buffer[0] = 'H';
 	G_io_apdu_buffer[1] = 'T';
 	G_io_apdu_buffer[2] = 'R';
