@@ -29,9 +29,8 @@ include $(BOLOS_SDK)/Makefile.defines
 APPNAME    = Hathor
 ICONNAME   = nanos_app_hathor.gif
 APPVERSION = 0.0.1
-P2PKH_VERSION_BYTE = 0x49
-#TODO change to mainnet byte
-#P2PKH_VERSION_BYTE = 0x28
+#P2PKH_VERSION_BYTE = 0x49	# testnet
+P2PKH_VERSION_BYTE = 0x28
 
 # The --path argument here restricts which BIP32 paths the app is allowed to derive.
 APP_LOAD_PARAMS = --appFlags 0x40 --path "44'/280'" --curve secp256k1 $(COMMON_LOAD_PARAMS)
