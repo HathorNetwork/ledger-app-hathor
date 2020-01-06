@@ -5,6 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+// this is the maximum string length to be displayed on Ledger. Usefull
+// for content that has to scroll horizontally on the screen.
+#define MAX_SCREEN_LENGTH 12
+
 typedef struct {
     // public key index for the address
     uint32_t keyIndex;
@@ -13,7 +17,7 @@ typedef struct {
     // the starting index to be shown
     uint8_t displayIndex;
     // NULL-terminated string for display
-    uint8_t partialAddress[13];
+    uint8_t partialAddress[MAX_SCREEN_LENGTH + 1];
 } getAddressContext_t;
 
 // TODO not useful using union now but it will be when we add signTx command

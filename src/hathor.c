@@ -14,6 +14,7 @@
 #define B58_MAX_INPUT_SIZE 120
 
 // All keys that we derive start with path 44'/280'/0'
+// We make `| 0x80000000` for hardened keys
 const uint32_t htr_bip44[] = { 44 | 0x80000000, 280 | 0x80000000, 0 | 0x80000000 };
 
 unsigned char const BASE58ALPHABET[] = {
