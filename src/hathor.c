@@ -15,7 +15,7 @@
 
 // All keys that we derive start with path 44'/280'/0'
 // We make `| 0x80000000` for hardened keys
-const uint32_t htr_bip44[] = { 44 | 0x80000000, 280 | 0x80000000, 0 | 0x80000000 };
+const uint32_t htr_bip44[] = { 44 | 0x80000000, HATHOR_BIP44_CODE | 0x80000000, 0 | 0x80000000 };
 
 unsigned char const BASE58ALPHABET[] = {
     '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F',
