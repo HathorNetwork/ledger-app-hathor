@@ -220,8 +220,10 @@ void format_value(uint64_t value, unsigned char *out) {
     char buf[35];
     char *p;
 
+    PRINTF("format_value %d\n", tmp);
     utoa(tmp, buf);
     c = 2 - strlen(buf) % 3;
+    //TODO check > 0
     for (p = buf; *p != 0; p++) {
        *out++ = *p;
        if (c == 1) {
@@ -229,6 +231,7 @@ void format_value(uint64_t value, unsigned char *out) {
        }
        c = (c + 1) % 3;
     }
+    //TODO remove this?
     *--out = 0;
 
     // now the part to the right
@@ -243,6 +246,7 @@ void format_value(uint64_t value, unsigned char *out) {
 
 void assert_length(size_t smaller, size_t larger) {
     if (smaller > larger) {
-        THROW(SW_INVALID_PARAM);
+        //THROW(SW_INVALID_PARAM);
+        THROW(2);   //TODO TX_STATE_PARTIAL
     }
 }

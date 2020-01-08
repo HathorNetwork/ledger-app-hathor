@@ -30,21 +30,28 @@ enum sign_tx_state_e {
 
 typedef struct {
     enum sign_tx_state_e state;
-    // used for caching the bytes when receiving the tx and for sighash_all data
-    uint8_t buffer[700];
+    // used for caching the bytes when receiving a partial element
+    uint8_t buffer[300];
     // total size used in the buffer
     uint8_t buffer_len;
+    // sha256 context for the hash
+    cx_sha256_t sha256;
+    // is there a change output in the tx? It there is, it won't be displayed to the user
     bool has_change_output;
     // on a given tx, which one is the change output (if exists)
     uint8_t change_output_index;
     // which key the change is sent to
     uint32_t change_key_index;
-    transaction_t transaction;
+    // tx info
+    uint8_t elem_type;
+    uint8_t tokens_len;
+    uint8_t inputs_len;
+    uint8_t outputs_len;
+    tx_output_t decoded_output;
     // display variables
     uint8_t current_output;
-    unsigned char info[70];      // address + HTR value
-    uint8_t output_fake_index;      // see sign_tx.c to understand its usage
-    // the starting index to be shown
+    unsigned char info[70];     // address + HTR value
+    // the starting index to be shown on a scrolling line (line2 here)
     uint8_t display_index;
     // NULL-terminated string for display
     char line1[11];

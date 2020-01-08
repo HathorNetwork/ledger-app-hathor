@@ -159,6 +159,9 @@ void init_tx(transaction_t *transaction);
  */
 uint8_t* parse_tx(uint8_t *in, size_t inlen, transaction_t *transaction);
 
+//TODO docstring
+uint8_t* parse_output(uint8_t *in, size_t inlen, tx_output_t *output);
+
 /**
  * Print basic information about a transaction. Used for debugging.
  *

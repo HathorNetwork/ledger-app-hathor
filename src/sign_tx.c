@@ -16,6 +16,99 @@
 
 static sign_tx_context_t *ctx = &global.sign_tx_context;
 
+// indicates a transaction decoder status
+typedef enum {
+    TX_STATE_ERR = 1,  // invalid transaction (NOTE: it's illegal to THROW(0))
+    TX_STATE_PARTIAL,  // no elements have been fully decoded yet
+    TX_STATE_READY,    // at least one element is fully decoded
+    TX_STATE_FINISHED, // reached end of transaction
+} tx_decoder_state_e;
+
+typedef enum {
+    ELEM_TOKEN_UID,
+    ELEM_INPUT,
+    ELEM_OUTPUT,
+} tx_element_type_e;
+
+void _decode_next_element() {
+    PRINTF("_decode_next_element buffer len %d\n", ctx->buffer_len);
+    if (ctx->tokens_len > 0) {
+        // read one token uid
+        if (ctx->buffer_len < 32) {
+            PRINTF("partial tokens, buffer len %d\n", ctx->buffer_len);
+            THROW(TX_STATE_PARTIAL);
+        }
+        // for now, we ignore it
+        ctx->tokens_len--;
+        ctx->buffer_len -= 32;
+        ctx->elem_type = ELEM_TOKEN_UID;
+        os_memmove(ctx->buffer, ctx->buffer + 32, ctx->buffer_len);
+        PRINTF("decoded token");
+    } else if (ctx->inputs_len > 0) {
+        // read input
+        if (ctx->buffer_len < 35) {     // tx_id (32 bytes) + index (1 byte) + data_len (2 bytes)
+            PRINTF("partial inputs, buffer len %d\n", ctx->buffer_len);
+            THROW(TX_STATE_PARTIAL);
+        }
+        // we require the input data to be empty, as we're signing the whole
+        // bytes we get from the wallet (in sighash_all, inputs must have no data)
+        if (U2BE(ctx->buffer, 33) > 0) {
+            THROW(TX_STATE_ERR);
+        }
+        // we ignore it
+        ctx->inputs_len--;
+        ctx->buffer_len -= 35;
+        ctx->elem_type = ELEM_INPUT;
+        os_memmove(ctx->buffer, ctx->buffer + 35, ctx->buffer_len);
+        PRINTF("decoded input");
+    } else if (ctx->outputs_len > 0) {
+        //uint8_t* parse_output(uint8_t *in, size_t inlen, tx_output_t *output) {
+        uint8_t *buf = parse_output(ctx->buffer, ctx->buffer_len, &ctx->decoded_output);
+        ctx->outputs_len--;
+        ctx->elem_type = ELEM_OUTPUT;
+        ctx->buffer_len -= buf - ctx->buffer;
+        os_memmove(ctx->buffer, buf, ctx->buffer_len);
+        PRINTF("decoded output");
+    } else {
+        // end of data we should read. Is there something left on the buffer?
+        if (ctx->buffer_len > 0) {
+            THROW(TX_STATE_ERR);
+        }
+        THROW(TX_STATE_FINISHED);
+    }
+
+    switch (ctx->elem_type) {
+        case ELEM_TOKEN_UID:
+            // not displaying token uid now
+            break;
+        case ELEM_INPUT:
+            // not displaying inputs
+            break;
+        case ELEM_OUTPUT:
+            THROW(TX_STATE_READY);
+    }
+}
+
+tx_decoder_state_e decode_next_element() {
+    volatile tx_decoder_state_e result;
+    BEGIN_TRY {
+        TRY {
+            // read until we reach a displayable element or the end of the buffer
+            for (;;) {
+                _decode_next_element();
+            }
+        }
+        CATCH_OTHER(e) {
+            result = e;
+        }
+        FINALLY {
+        }
+    }
+    END_TRY;
+    PRINTF("decode_next_element result %d\n", result);
+    return result;
+}
+
 /*
  * Parses the change output info and returns its size. The first byte indicates
  * whether there's change or not (no change output if byte=0x00). There are 2
@@ -40,24 +133,6 @@ static uint8_t parse_change_output_info(uint8_t *in, size_t inlen) {
 }
 
 /*
- * Returns the first output to be display. In general, that's output 0. This is only
- * not true if output 0 is the change output. In that case, the first output to be
- * displayed is 1.
- */
-static uint8_t get_first_output() {
-    return ((ctx->has_change_output && ctx->change_output_index == 0) ? 1 : 0);
-}
-
-/*
- * Returns the last output to be displayed. In general, the change output is the last
- * in a transaction, so the last to be displayed is the second to last.
- */
-static uint8_t get_last_output() {
-    return (ctx->has_change_output && ctx->change_output_index == (ctx->transaction.outputs_len - 1)
-            ? ctx->transaction.outputs_len - 2 : ctx->transaction.outputs_len - 1);
-}
-
-/*
  * Gets the next output to be displayed, given an output index. Skips the change output.
  */
 static uint8_t get_next_output(uint8_t index) {
@@ -76,8 +151,7 @@ static uint8_t get_previous_output(uint8_t index) {
 /*
  * Prepare the output information that will be displayed.
  */
-static void prepare_display_output(uint8_t index) {
-    tx_output_t output = ctx->transaction.outputs[index];
+static void prepare_display_output(tx_output_t output) {
     unsigned char address[25];
     pubkey_hash_to_address(output.pubkey_hash, address);
     uint8_t len = encode_base58(address, 25, ctx->info, sizeof(ctx->info));
@@ -134,9 +208,10 @@ static unsigned int ui_sign_tx_confirm_button(unsigned int button_mask, unsigned
     return 0;
 }
 
-// Define the sign tx screen. User will be able to scroll through all outputs
+// Define the sign tx screen. User will be able to scroll through an output.
 // (address + value) with left/right buttons. When he's done, he will click both
-// buttons and a final confirmation screen appears.
+// buttons and see next output. A final confirmation screen appears before 
+// sending tokens.
 static const bagl_element_t ui_sign_tx_compare[] = {
     UI_BACKGROUND(),
 
@@ -153,12 +228,11 @@ static const bagl_element_t ui_sign_tx_compare[] = {
 static const bagl_element_t* ui_prepro_sign_tx_compare(const bagl_element_t *element) {
     switch (element->component.userid) {
     case 1:
-        // 0x01 is the left icon so return NULL if we're displaying the beginning of the first element.
-        return ((ctx->current_output == get_first_output() && ctx->display_index == 0) ? NULL : element);
+        // 0x01 is the left icon so return NULL if we're displaying the beginning of the text.
+        return (ctx->display_index == 0) ? NULL : element;
     case 2:
-        // 0x02 is the right, so return NULL if we're displaying the end of the last element.
-        return ((ctx->current_output == get_last_output()
-                    && ctx->display_index == (strlen((const char*)ctx->info) - 12)) ? NULL : element);
+        // 0x02 is the right, so return NULL if we're displaying the end of the text.
+        return ctx->display_index == (strlen((const char*)ctx->info) - 12) ? NULL : element;
     default:
         // Always display all other elements.
         return element;
@@ -173,23 +247,12 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
         case BUTTON_EVT_FAST | BUTTON_LEFT: // SEEK LEFT
             if (ctx->display_index == 0) {
                 // we're at the beginning of an output
-                if (ctx->current_output == get_first_output()) {
-                    // it's the first output, so can't scroll left
-                    UX_REDISPLAY();
-                    break;
-                } else {
-                    // go to previous output
-                    ctx->current_output = get_previous_output(ctx->current_output);
-                    prepare_display_output(ctx->current_output);
-                    ctx->display_index = strlen((const char*)ctx->info) - 12;
-                    ctx->output_fake_index--;
-                    itoa(ctx->output_fake_index, ctx->line1 + 8, 10);
-                }
+                // TODO can return without UX_REDISPLAY?
             } else {
                 ctx->display_index--;
+                os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
             }
 
-            os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
             UX_REDISPLAY();
             break;
 
@@ -198,32 +261,41 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
         case BUTTON_EVT_FAST | BUTTON_RIGHT: // SEEK RIGHT
             if (ctx->display_index == strlen((const char*)ctx->info) - 12) {
                 // we're at the end of one of the outputs
-                if (ctx->current_output == get_last_output()) {
-                    // if it's the last one, do nothing
-                    UX_REDISPLAY();
-                    break;
-                } else {
-                    // go to next output
-                    ctx->current_output = get_next_output(ctx->current_output);
-                    prepare_display_output(ctx->current_output);
-                    ctx->display_index = 0;
-                    ctx->output_fake_index++;
-                    itoa(ctx->output_fake_index, ctx->line1 + 8, 10);
-                }
+                // TODO can return without UX_REDISPLAY?
             } else {
                 ctx->display_index++;
+                os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
             }
 
-            os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
             UX_REDISPLAY();
             break;
 
-        case BUTTON_EVT_RELEASED | BUTTON_LEFT | BUTTON_RIGHT: // PROCEED
-            // Go to confirmation screen
-            os_memmove(ctx->line1, "Send\0", 5);
-            os_memmove(ctx->line2, "transaction?\0", 13);
-            UX_DISPLAY(ui_sign_tx_confirm, ui_prepro_sign_tx_confirm);
-            break;
+        case BUTTON_EVT_RELEASED | BUTTON_LEFT | BUTTON_RIGHT: // PROCEED TO NEXT OUTPUT
+            ctx->display_index = 0;
+            switch(decode_next_element()) {
+                case TX_STATE_ERR:
+                    THROW(SW_INVALID_PARAM);
+                    break;
+                case TX_STATE_PARTIAL:
+                    THROW(SW_OK);
+                    break;
+                case TX_STATE_READY:
+                    //display element
+                    prepare_display_output(ctx->decoded_output);
+                    os_memmove(ctx->line1, "Output #\n", 9);
+                    os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
+                    ctx->line2[12] = '\0';
+
+                    UX_REDISPLAY();
+                    break;
+                case TX_STATE_FINISHED:
+                    // TODO is this really the last one?
+                    // Go to confirmation screen
+                    os_memmove(ctx->line1, "Send\0", 5);
+                    os_memmove(ctx->line2, "transaction?\0", 13);
+                    UX_DISPLAY(ui_sign_tx_confirm, ui_prepro_sign_tx_confirm);
+                    break;
+            }
     }
     return 0;
 }
@@ -242,6 +314,8 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
     }
 
     if (p1 == 1) {
+        //TODO can only enter here after ctx->state == USER_APPROVED
+
         // asking for signature
         uint32_t key_index = U4BE(data_buffer, 0);
 
@@ -266,7 +340,6 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
 
     if (p1 == 0) {
         // we're receiving transaction data
-        uint8_t change_output_info_len = 0;
         if (ctx->state == USER_APPROVED) {
             // can't receive more data after user's approval
             PRINTF("user already approved\n");
@@ -274,6 +347,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
         }
 
         if (ctx->state == UNINITIALIZED) {
+            PRINTF("initializing\n");
             // starting new tx; not initialized yet
             ctx->state = RECEIVING_DATA;
             ctx->buffer_len = 0;
@@ -282,17 +356,64 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
             ctx->change_key_index = 0;
             ctx->current_output = 0;
             ctx->display_index = 0;
-            init_tx(&ctx->transaction);
+            cx_sha256_init(&ctx->sha256);
+
             // the first chunk of data has the change output info
-            change_output_info_len = parse_change_output_info(data_buffer, data_length);
+            uint8_t offset = parse_change_output_info(data_buffer, data_length);
+
+            // copy all remaining bytes to hash
+            cx_hash(&ctx->sha256.header, 0, data_buffer + offset, data_length - offset, NULL, 0);
+
+            // also get length of tokens, inputs and outputs
+            assert_length(5, data_length - offset);    // version + tokens_len + inputs_len + outputs_len
+            //transaction->version = U2BE(data_buffer, offset);
+            offset += 2;
+            ctx->tokens_len = data_buffer[offset];
+            offset++;
+            ctx->inputs_len = data_buffer[offset];
+            offset++;
+            ctx->outputs_len = data_buffer[offset];
+            offset++;
+
+            PRINTF("tx tokens %d inputs %d outputs %d\n", ctx->tokens_len, ctx->inputs_len, ctx->outputs_len);
+            // copy remaining bytes to decode buffer
+            PRINTF("data length %d; offset %d\n", data_length, offset);
+            ctx->buffer_len = data_length - offset;
+            os_memcpy(ctx->buffer, data_buffer + offset, ctx->buffer_len);
+        } else {
+            PRINTF("got more data: %d bytes\n", data_length);
+            // add it to the hash
+            cx_hash(&ctx->sha256.header, 0, data_buffer, data_length, NULL, 0);
+
+            // copy to decode buffer
+            os_memcpy(ctx->buffer + ctx->buffer_len, data_buffer, data_length);
+            ctx->buffer_len += data_length;
         }
 
-        if (p2 >= 0) {
-            // Receiving data. Skipe the change output info if this is the first chunk
-            os_memcpy(ctx->buffer + ctx->buffer_len, data_buffer + change_output_info_len, data_length - change_output_info_len);
-            ctx->buffer_len += (data_length - change_output_info_len);
+        // at this point, ctx->buffer has bytes to be decoded
+        switch(decode_next_element()) {
+            case TX_STATE_ERR:
+                THROW(SW_INVALID_PARAM);
+                break;
+            case TX_STATE_PARTIAL:
+                break;
+            case TX_STATE_READY:
+                //display element
+                prepare_display_output(ctx->decoded_output);
+                os_memmove(ctx->line1, "Output #\n", 9);
+                os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
+                ctx->line2[12] = '\0';
+
+                UX_DISPLAY(ui_sign_tx_compare, ui_prepro_sign_tx_compare);
+                *flags |= IO_ASYNCH_REPLY;
+                return;
+            case TX_STATE_FINISHED:
+                // TODO is this really the last one?
+                break;
         }
 
+
+/*
         if (p2 == 0) {
             // end of data, parse it
             uint8_t *ret = parse_tx(ctx->buffer, ctx->buffer_len, &ctx->transaction);
@@ -348,6 +469,8 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
             *flags |= IO_ASYNCH_REPLY;
             return;
         }
+*/
+
         io_exchange_with_code(SW_OK, 0);
     }
 }
