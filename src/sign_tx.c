@@ -30,38 +30,65 @@ typedef enum {
     ELEM_OUTPUT,
 } tx_element_type_e;
 
+// verifies an output sends its funds to a given key index. Used
+// for confirming the change output. Returns false if not valid.
+bool verify_change_output(tx_output_t output, uint8_t index) {
+    // bip32 path for 44'/280'/0'/0/key_index
+    uint32_t path[5];
+    uint8_t hash[32];
+    cx_ecfp_public_key_t public_key;
+    cx_ecfp_private_key_t private_key;
+    memcpy(path, htr_bip44, 3*sizeof(uint32_t));
+    path[3] = 0;
+    path[4] = index;
+
+    // Get pubkey hash for path
+    derive_keypair(path, 5, &private_key, &public_key, NULL);
+    compress_public_key(public_key.W);
+    hash160(public_key.W, 33, hash);
+    // erase sensitive data
+    explicit_bzero(&private_key, sizeof(private_key));
+    explicit_bzero(&public_key, sizeof(public_key));
+    if (os_memcmp(hash, output.pubkey_hash, 20) != 0) {
+        // not the same
+        PRINTF("change output pubkey hash does not match given index\n");
+        return false;
+    }
+    return true;
+}
+
 void _decode_next_element() {
-    if (ctx->tokens_len > 0) {
+    if (ctx->remaining_tokens > 0) {
         // read one token uid
         if (ctx->buffer_len < 32) {
             PRINTF("partial tokens, buffer len %d\n", ctx->buffer_len);
             THROW(TX_STATE_PARTIAL);
         }
         // for now, we ignore it
-        ctx->tokens_len--;
+        ctx->remaining_tokens--;
         ctx->buffer_len -= 32;
         ctx->elem_type = ELEM_TOKEN_UID;
         os_memmove(ctx->buffer, ctx->buffer + 32, ctx->buffer_len);
         PRINTF("decoded token\n");
-    } else if (ctx->inputs_len > 0) {
+    } else if (ctx->remaining_inputs > 0) {
         // read input
         if (ctx->buffer_len < 35) {     // tx_id (32 bytes) + index (1 byte) + data_len (2 bytes)
             PRINTF("partial inputs, buffer len %d\n", ctx->buffer_len);
             THROW(TX_STATE_PARTIAL);
         }
-        // we require the input data to be empty, as we're signing the whole
+        // we require the input data to be empty because we're signing the whole
         // bytes we get from the wallet (in sighash_all, inputs must have no data)
         if (U2BE(ctx->buffer, 33) > 0) {
             THROW(TX_STATE_ERR);
         }
         // we ignore it
-        ctx->inputs_len--;
+        ctx->remaining_inputs--;
         ctx->buffer_len -= 35;
         ctx->elem_type = ELEM_INPUT;
         os_memmove(ctx->buffer, ctx->buffer + 35, ctx->buffer_len);
         PRINTF("decoded input\n");
     } else if (ctx->outputs_len > 0) {
-        //uint8_t* parse_output(uint8_t *in, size_t inlen, tx_output_t *output) {
+        ctx->current_output++;
         uint8_t *buf = parse_output(ctx->buffer, ctx->buffer_len, &ctx->decoded_output);
         ctx->outputs_len--;
         ctx->elem_type = ELEM_OUTPUT;
@@ -84,7 +111,16 @@ void _decode_next_element() {
             // not displaying inputs
             break;
         case ELEM_OUTPUT:
-            THROW(TX_STATE_READY);
+            // check if this is the change output
+            if (ctx->has_change_output && ctx->change_output_index == ctx->current_output) {
+                if (!verify_change_output(ctx->decoded_output, ctx->change_key_index)) {
+                    THROW(TX_STATE_ERR);
+                }
+            } else {
+                // if it's not change output, raise TX_STATE_READY to display output on screen
+                THROW(TX_STATE_READY);
+            }
+            break;
     }
 }
 
@@ -132,30 +168,23 @@ static uint8_t parse_change_output_info(uint8_t *in, size_t inlen) {
 }
 
 /*
- * Gets the next output to be displayed, given an output index. Skips the change output.
- */
-static uint8_t get_next_output(uint8_t index) {
-    uint8_t next = index + 1;
-    return ((ctx->has_change_output && next == ctx->change_output_index) ? next + 1 : next);
-}
-
-/*
- * Gets the previous output to be displayed, given an output index. Skips the change output.
- */
-static uint8_t get_previous_output(uint8_t index) {
-    uint8_t prev = index - 1;
-    return ((ctx->has_change_output && prev == ctx->change_output_index) ? prev - 1 : prev);
-}
-
-/*
  * Prepare the output information that will be displayed.
  */
 static void prepare_display_output(tx_output_t output) {
+    // first prepare the address + value line
     unsigned char address[25];
     pubkey_hash_to_address(output.pubkey_hash, address);
     uint8_t len = encode_base58(address, 25, ctx->info, sizeof(ctx->info));
     os_memmove(ctx->info + len, " HTR ", 5);
     format_value(output.value, ctx->info + len + 5);
+
+    // now line1 and line2
+    uint8_t fake_output_index = (ctx->has_change_output && ctx->current_output < ctx->change_output_index)
+        ? ctx->current_output : ctx->current_output - 1;
+    os_memmove(ctx->line1, "Output #", 8);
+    itoa(fake_output_index, ctx->line1 + 8, 10);
+    os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
+    ctx->line2[12] = '\0';
 }
 
 static const bagl_element_t* ui_prepro_sign_tx_confirm(const bagl_element_t *element) {
@@ -280,10 +309,12 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
                     break;
                 case TX_STATE_READY:
                     //display element
-                    prepare_display_output(ctx->decoded_output);
-                    os_memmove(ctx->line1, "Output #\n", 9);
-                    os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
-                    ctx->line2[12] = '\0';
+                    if (ctx->elem_type == ELEM_OUTPUT) {
+                        prepare_display_output(ctx->decoded_output);
+                    } else {
+                        PRINTF("ERROR: Display element is not output!!");
+                        THROW(SW_INVALID_PARAM);
+                    }
 
                     UX_REDISPLAY();
                     break;
@@ -359,7 +390,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
             ctx->has_change_output = false;
             ctx->change_output_index = 0;
             ctx->change_key_index = 0;
-            ctx->current_output = 0;
+            ctx->current_output = -1;
             ctx->display_index = 0;
             ctx->sighash_all[0] = '\0';
             cx_sha256_init(&ctx->sha256);
@@ -373,17 +404,17 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
             cx_hash(&ctx->sha256.header, 0, data_buffer + offset, data_length - offset, NULL, 0);
 
             // also get length of tokens, inputs and outputs
-            assert_length(5, data_length - offset);    // version + tokens_len + inputs_len + outputs_len
+            assert_length(5, data_length - offset);    // version + remaining_tokens + remaining_inputs + outputs_len
             //transaction->version = U2BE(data_buffer, offset);
             offset += 2;
-            ctx->tokens_len = data_buffer[offset];
+            ctx->remaining_tokens = data_buffer[offset];
             offset++;
-            ctx->inputs_len = data_buffer[offset];
+            ctx->remaining_inputs = data_buffer[offset];
             offset++;
             ctx->outputs_len = data_buffer[offset];
             offset++;
 
-            PRINTF("tx tokens %d inputs %d outputs %d\n", ctx->tokens_len, ctx->inputs_len, ctx->outputs_len);
+            PRINTF("tx tokens %d inputs %d outputs %d\n", ctx->remaining_tokens, ctx->remaining_inputs, ctx->outputs_len);
             // copy remaining bytes to decode buffer
             ctx->buffer_len = data_length - offset;
             os_memcpy(ctx->buffer, data_buffer + offset, ctx->buffer_len);
@@ -407,9 +438,6 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
             case TX_STATE_READY:
                 //display element
                 prepare_display_output(ctx->decoded_output);
-                os_memmove(ctx->line1, "Output #\n", 9);
-                os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
-                ctx->line2[12] = '\0';
 
                 UX_DISPLAY(ui_sign_tx_compare, ui_prepro_sign_tx_compare);
                 *flags |= IO_ASYNCH_REPLY;
@@ -418,65 +446,6 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
                 // TODO is this really the last one?
                 break;
         }
-
-
-/*
-        if (p2 == 0) {
-            // end of data, parse it
-            uint8_t *ret = parse_tx(ctx->buffer, ctx->buffer_len, &ctx->transaction);
-
-            if (ret - ctx->buffer != ctx->buffer_len) {
-                // we finished parsing the tx but there's extra data on the buffer
-                io_exchange_with_code(SW_DEVELOPER_ERR, 0);
-                return;
-            }
-
-            // check if change output is within existing outputs
-            if (ctx->change_output_index >= ctx->transaction.outputs_len) {
-                PRINTF("change index > outputs len\n");
-                io_exchange_with_code(SW_INVALID_PARAM, 0);
-                return;
-            }
-
-            // check that change output has pubkey hash matching informed key index
-            if (ctx->has_change_output) {
-                // bip32 path for 44'/280'/0'/0/key_index
-                memcpy(path, htr_bip44, 3*sizeof(uint32_t));
-                path[3] = 0;
-                path[4] = ctx->change_key_index;
-
-                // Get pubkey hash for path
-                derive_keypair(path, 5, &private_key, &public_key, NULL);
-                compress_public_key(public_key.W);
-                hash160(public_key.W, 33, hash);
-                // erase sensitive data
-                explicit_bzero(&private_key, sizeof(private_key));
-                explicit_bzero(&public_key, sizeof(public_key));
-                if (os_memcmp(hash, ctx->transaction.outputs[ctx->change_output_index].pubkey_hash, 20) != 0) {
-                    // not the same
-                    PRINTF("change output pubkey hash does not match given index\n");
-                    io_exchange_with_code(SW_INVALID_PARAM, 0);
-                    return;
-                }
-            }
-
-            // prepare the outputs
-            ctx->current_output = get_first_output();
-            prepare_display_output(ctx->current_output);
-            os_memmove(ctx->line1, "Output #", 8);
-            // we use this "fake index" to always show consecutive output numbers to the
-            // user. As the change output is not always the last and we never display it,
-            // we coould skip one number when displaying the outputs to the user.
-            ctx->output_fake_index = 0;
-            itoa(ctx->output_fake_index, ctx->line1 + 8, 10);
-            os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
-            ctx->line2[12] = '\0';
-
-            UX_DISPLAY(ui_sign_tx_compare, ui_prepro_sign_tx_compare);
-            *flags |= IO_ASYNCH_REPLY;
-            return;
-        }
-*/
 
         io_exchange_with_code(SW_OK, 0);
     }

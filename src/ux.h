@@ -43,18 +43,18 @@ typedef struct {
     // which key the change is sent to
     uint32_t change_key_index;
     // tx info
-    uint8_t elem_type;
-    uint8_t tokens_len;
-    uint8_t inputs_len;
+    uint8_t remaining_tokens;
+    uint8_t remaining_inputs;
     uint8_t outputs_len;
+    uint8_t elem_type;          // type of decoded element
+    int16_t current_output;     // we need a signed int because it starts at -1
     tx_output_t decoded_output;
     // display variables
-    uint8_t current_output;
     unsigned char info[70];     // address + HTR value
     // the starting index to be shown on a scrolling line (line2 here)
     uint8_t display_index;
     // NULL-terminated string for display
-    char line1[11];
+    char line1[15];
     char line2[13];
     uint8_t sighash_all[32];
 } sign_tx_context_t;
