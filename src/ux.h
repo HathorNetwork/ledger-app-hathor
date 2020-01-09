@@ -56,6 +56,7 @@ typedef struct {
     // NULL-terminated string for display
     char line1[11];
     char line2[13];
+    uint8_t sighash_all[32];
 } sign_tx_context_t;
 
 // To save memory, we store all the context types in a single global union,

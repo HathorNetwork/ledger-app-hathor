@@ -31,7 +31,6 @@ typedef enum {
 } tx_element_type_e;
 
 void _decode_next_element() {
-    PRINTF("_decode_next_element buffer len %d\n", ctx->buffer_len);
     if (ctx->tokens_len > 0) {
         // read one token uid
         if (ctx->buffer_len < 32) {
@@ -43,7 +42,7 @@ void _decode_next_element() {
         ctx->buffer_len -= 32;
         ctx->elem_type = ELEM_TOKEN_UID;
         os_memmove(ctx->buffer, ctx->buffer + 32, ctx->buffer_len);
-        PRINTF("decoded token");
+        PRINTF("decoded token\n");
     } else if (ctx->inputs_len > 0) {
         // read input
         if (ctx->buffer_len < 35) {     // tx_id (32 bytes) + index (1 byte) + data_len (2 bytes)
@@ -60,7 +59,7 @@ void _decode_next_element() {
         ctx->buffer_len -= 35;
         ctx->elem_type = ELEM_INPUT;
         os_memmove(ctx->buffer, ctx->buffer + 35, ctx->buffer_len);
-        PRINTF("decoded input");
+        PRINTF("decoded input\n");
     } else if (ctx->outputs_len > 0) {
         //uint8_t* parse_output(uint8_t *in, size_t inlen, tx_output_t *output) {
         uint8_t *buf = parse_output(ctx->buffer, ctx->buffer_len, &ctx->decoded_output);
@@ -68,7 +67,7 @@ void _decode_next_element() {
         ctx->elem_type = ELEM_OUTPUT;
         ctx->buffer_len -= buf - ctx->buffer;
         os_memmove(ctx->buffer, buf, ctx->buffer_len);
-        PRINTF("decoded output");
+        PRINTF("decoded output\n");
     } else {
         // end of data we should read. Is there something left on the buffer?
         if (ctx->buffer_len > 0) {
@@ -305,7 +304,6 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
     cx_ecfp_private_key_t private_key;
     // bip32 path for 44'/280'/0'/0/key_index
     uint32_t path[5];
-    uint8_t hash[32];
 
     if (p1 == 2) {
         // all done, go back to main menu
@@ -318,6 +316,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
 
         // asking for signature
         uint32_t key_index = U4BE(data_buffer, 0);
+        PRINTF("sign tx with priv key %d\n", key_index);
 
         // bip32 path for 44'/280'/0'/0/key_index
         memcpy(path, htr_bip44, 3*sizeof(uint32_t));
@@ -327,9 +326,15 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
         // Get key for path
         derive_keypair(path, 5, &private_key, &public_key, NULL);
 
+        if (ctx->sighash_all[0] == '\0') {
+            // finish the first hash of the data
+            cx_hash(&ctx->sha256.header, CX_LAST, ctx->sighash_all, 0, ctx->sighash_all, 32);
+            // now get second sha256 of data
+            cx_sha256_init(&ctx->sha256);
+            cx_hash(&ctx->sha256.header, CX_LAST, ctx->sighash_all, 32, ctx->sighash_all, 32);
+        }
         // sign message (sha256d of sighash_all data)
-        sha256d(ctx->buffer, ctx->buffer_len, hash);
-        int sig_size = cx_ecdsa_sign(&private_key, CX_LAST | CX_RND_RFC6979, CX_SHA256, hash, 32, G_io_apdu_buffer, 256, NULL);
+        int sig_size = cx_ecdsa_sign(&private_key, CX_LAST | CX_RND_RFC6979, CX_SHA256, ctx->sighash_all, 32, G_io_apdu_buffer, 256, NULL);
 
         // erase sensitive data
         explicit_bzero(&private_key, sizeof(private_key));
@@ -356,10 +361,13 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
             ctx->change_key_index = 0;
             ctx->current_output = 0;
             ctx->display_index = 0;
+            ctx->sighash_all[0] = '\0';
             cx_sha256_init(&ctx->sha256);
 
             // the first chunk of data has the change output info
             uint8_t offset = parse_change_output_info(data_buffer, data_length);
+            PRINTF("data length %d; offset %d\n", data_length, offset);
+            PRINTF("start of sighash %x %x\n", *(data_buffer + offset), *(data_buffer + offset + 1));
 
             // copy all remaining bytes to hash
             cx_hash(&ctx->sha256.header, 0, data_buffer + offset, data_length - offset, NULL, 0);
@@ -377,7 +385,6 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
 
             PRINTF("tx tokens %d inputs %d outputs %d\n", ctx->tokens_len, ctx->inputs_len, ctx->outputs_len);
             // copy remaining bytes to decode buffer
-            PRINTF("data length %d; offset %d\n", data_length, offset);
             ctx->buffer_len = data_length - offset;
             os_memcpy(ctx->buffer, data_buffer + offset, ctx->buffer_len);
         } else {
