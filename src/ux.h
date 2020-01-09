@@ -47,7 +47,7 @@ typedef struct {
     uint8_t remaining_inputs;
     uint8_t outputs_len;
     uint8_t elem_type;          // type of decoded element
-    int16_t current_output;     // we need a signed int because it starts at -1
+    uint8_t current_output;
     tx_output_t decoded_output;
     // display variables
     unsigned char info[70];     // address + HTR value

@@ -87,13 +87,13 @@ void _decode_next_element() {
         ctx->elem_type = ELEM_INPUT;
         os_memmove(ctx->buffer, ctx->buffer + 35, ctx->buffer_len);
         PRINTF("decoded input\n");
-    } else if (ctx->outputs_len > 0) {
-        ctx->current_output++;
+    } else if (ctx->current_output < ctx->outputs_len) {
         uint8_t *buf = parse_output(ctx->buffer, ctx->buffer_len, &ctx->decoded_output);
-        ctx->outputs_len--;
+        ctx->decoded_output.index = ctx->current_output;
         ctx->elem_type = ELEM_OUTPUT;
         ctx->buffer_len -= buf - ctx->buffer;
         os_memmove(ctx->buffer, buf, ctx->buffer_len);
+        ctx->current_output++;
         PRINTF("decoded output\n");
     } else {
         // end of data we should read. Is there something left on the buffer?
@@ -112,7 +112,7 @@ void _decode_next_element() {
             break;
         case ELEM_OUTPUT:
             // check if this is the change output
-            if (ctx->has_change_output && ctx->change_output_index == ctx->current_output) {
+            if (ctx->has_change_output && ctx->change_output_index == ctx->decoded_output.index) {
                 if (!verify_change_output(ctx->decoded_output, ctx->change_key_index)) {
                     THROW(TX_STATE_ERR);
                 }
@@ -178,11 +178,19 @@ static void prepare_display_output(tx_output_t output) {
     os_memmove(ctx->info + len, " HTR ", 5);
     format_value(output.value, ctx->info + len + 5);
 
-    // now line1 and line2
-    uint8_t fake_output_index = (ctx->has_change_output && ctx->current_output < ctx->change_output_index)
-        ? ctx->current_output : ctx->current_output - 1;
-    os_memmove(ctx->line1, "Output #", 8);
-    itoa(fake_output_index, ctx->line1 + 8, 10);
+    // line1
+    // we subtract 1 because output indexes start at 0; if there's change output, subtract one more
+    uint8_t total_outputs = ctx->has_change_output ? ctx->outputs_len - 2 : ctx->outputs_len - 1;
+    // fake_output_index is used to display contiguous indexes to the user when there's change output
+    uint8_t fake_output_index = (ctx->has_change_output && ctx->decoded_output.index < ctx->change_output_index)
+        ? ctx->decoded_output.index : ctx->decoded_output.index - 1;
+    os_memmove(ctx->line1, "Output ", 7);
+    itoa(fake_output_index, ctx->line1 + 7, 10);
+    len = strlen(ctx->line1);
+    ctx->line1[len++] = '/';
+    itoa(total_outputs, ctx->line1 + len, 10);
+
+    // line2
     os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
     ctx->line2[12] = '\0';
 }
@@ -390,7 +398,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
             ctx->has_change_output = false;
             ctx->change_output_index = 0;
             ctx->change_key_index = 0;
-            ctx->current_output = -1;
+            ctx->current_output = 0;
             ctx->display_index = 0;
             ctx->sighash_all[0] = '\0';
             cx_sha256_init(&ctx->sha256);
