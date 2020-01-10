@@ -131,6 +131,12 @@ void itoa(int value, char* result, int base) {
 }
 
 void utoa(uint64_t value, char *s) {
+    // small optimization
+    if (value < 10) {
+        s[0] = '0' + (uint8_t)value;
+        s[1] = 0;
+        return;
+    }
     uint64_t tmp = value;
     uint8_t idx = 0;
     while (tmp > 0) {
@@ -138,6 +144,6 @@ void utoa(uint64_t value, char *s) {
         tmp = tmp / 10;
         idx++;
     }
-    s[idx] = '\0';
+    s[idx] = 0;
     strrev(s);
 }
