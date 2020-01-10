@@ -33,12 +33,13 @@ typedef struct {
     // used for caching the bytes when receiving a partial element
     uint8_t buffer[300];
     // total size used in the buffer
-    uint8_t buffer_len;
+    uint16_t buffer_len;
     // sha256 context for the hash
     cx_sha256_t sha256;
+    uint8_t sighash_all[32];
     // is there a change output in the tx? It there is, it won't be displayed to the user
     bool has_change_output;
-    // on a given tx, which one is the change output (if exists)
+    // on a given tx, which one is the change output (if it exists)
     uint8_t change_output_index;
     // which key the change is sent to
     uint32_t change_key_index;
@@ -46,7 +47,8 @@ typedef struct {
     uint8_t remaining_tokens;
     uint8_t remaining_inputs;
     uint8_t outputs_len;
-    uint8_t elem_type;          // type of decoded element
+    // type of decoded element
+    uint8_t elem_type;
     uint8_t current_output;
     tx_output_t decoded_output;
     // display variables
@@ -56,7 +58,6 @@ typedef struct {
     // NULL-terminated string for display
     char line1[15];
     char line2[13];
-    uint8_t sighash_all[32];
 } sign_tx_context_t;
 
 // To save memory, we store all the context types in a single global union,

@@ -27,7 +27,7 @@ typedef struct {
 // TODO only p2pkh and HTR for now
 // TODO add timelock
 typedef struct {
-    uint8_t index;
+    uint8_t index;      // the index of this output in the tx
     uint64_t value;
     // hash160 of public key
     uint8_t token_data;

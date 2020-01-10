@@ -89,12 +89,12 @@ void _decode_next_element() {
         PRINTF("decoded input\n");
     } else if (ctx->current_output < ctx->outputs_len) {
         uint8_t *buf = parse_output(ctx->buffer, ctx->buffer_len, &ctx->decoded_output);
+        PRINTF("decoded output\n");
         ctx->decoded_output.index = ctx->current_output;
         ctx->elem_type = ELEM_OUTPUT;
         ctx->buffer_len -= (buf - ctx->buffer);
         os_memmove(ctx->buffer, buf, ctx->buffer_len);
         ctx->current_output++;
-        PRINTF("decoded output\n");
     } else {
         // end of data we should read. Is there something left on the buffer?
         if (ctx->buffer_len > 0) {
