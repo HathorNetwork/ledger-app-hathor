@@ -38,13 +38,10 @@ typedef enum {
 } tx_decoder_state_e;
 
 /**
- * Get the private/public keys and chain code for the desired path.
- *
- * @param  [in] path
- *   The BIP-32 path.
- *
- * @param  [in] path_len
- *   Length of the path.
+ * Get the private/public keys and chain code for the desired path. This
+ * function accepts a variable number of arguments and always derives paths
+ * starting on 44'/280'/0'. So if there are 2 variable arguments (0 and 5),
+ * the derived path will be 44'/280'/0'/0/5
  *
  * @param [out] private_key
  *   The private key for the given path.
@@ -55,13 +52,19 @@ typedef enum {
  * @param [out] chain_code
  *   Chain code for this path.
  *
+ * @param  [in] n_args
+ *   Number of variable arguments.
+ *
+ * @param  [in] ...
+ *   The indexes for deriving the keypair.
+ *
  */
 void derive_keypair(
-    uint32_t *path,
-    unsigned int path_len,
     cx_ecfp_private_key_t *private_key,
     cx_ecfp_public_key_t *public_key,
-    unsigned char *chain_code);
+    unsigned char *chain_code,
+    int n_args,
+    ...);
 
 /**
  * Performs the sha256d (double sha256) of the data.
@@ -129,7 +132,19 @@ void pubkey_hash_to_address(uint8_t *public_key_hash, uint8_t *out);
 void pubkey_to_address(cx_ecfp_public_key_t *public_key, uint8_t *out);
 
 
-//TODO docstring
+/**
+ * Parses an output from bytes.
+ *
+ * @param  [in] in
+ *   Data to be parsed.
+ *
+ * @param  [in] inlen
+ *   Size of data to be parsed.
+ *
+ * @param [out] output
+ *   Holds the decoded output.
+ *
+ */
 uint8_t* parse_output(uint8_t *in, size_t inlen, tx_output_t *output);
 
 /**

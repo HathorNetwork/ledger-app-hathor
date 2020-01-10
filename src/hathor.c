@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -17,15 +18,25 @@
 const uint32_t htr_bip44[] = { 44 | 0x80000000, 280 | 0x80000000, 0 | 0x80000000 };
 
 void derive_keypair(
-    uint32_t *path,
-    unsigned int path_len,
     cx_ecfp_private_key_t *private_key,
     cx_ecfp_public_key_t *public_key,
-    unsigned char *chain_code
+    unsigned char *chain_code,
+    int n_args,
+    ...
 ) {
     unsigned char private_component[32];
+    va_list ap;
+    int i;
+    uint32_t path[3 + n_args];
+    memcpy(path, htr_bip44, 3*sizeof(uint32_t));
 
-    os_perso_derive_node_bip32(CX_CURVE_256K1, path, path_len, private_component, chain_code);
+    va_start(ap, n_args);
+    for(i = 0; i < n_args; i++) {
+        path[3 + i] = va_arg(ap, int);
+    }
+    va_end(ap);
+
+    os_perso_derive_node_bip32(CX_CURVE_256K1, path, 3 + n_args, private_component, chain_code);
     cx_ecdsa_init_private_key(CX_CURVE_256K1, private_component, 32, private_key);
     cx_ecfp_generate_pair(CX_CURVE_256K1, public_key, private_key, 1);
 }

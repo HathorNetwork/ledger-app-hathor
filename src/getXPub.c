@@ -41,11 +41,6 @@ static unsigned int ui_getXPub_approve_button(unsigned int button_mask, unsigned
     unsigned char chain_code[32];
     unsigned char hash_160[20];
 
-    // bip32 path for 44'/280'/0'/0
-    uint32_t path[4];
-    memcpy(path, htr_bip44, 3*sizeof(uint32_t));
-    path[3] = 0;
-
     switch (button_mask) {
     case BUTTON_EVT_RELEASED | BUTTON_LEFT: // REJECT
         // Send an error code to the computer. The application on the computer
@@ -57,14 +52,15 @@ static unsigned int ui_getXPub_approve_button(unsigned int button_mask, unsigned
         break;
 
     case BUTTON_EVT_RELEASED | BUTTON_RIGHT: // APPROVE
-        derive_keypair(path, 4, &private_key, &public_key, chain_code);
+        // get key pair for path 44'/280'/0'/0
+        derive_keypair(&private_key, &public_key, chain_code, 1, 0);
         memcpy(G_io_apdu_buffer + tx, public_key.W, public_key.W_len);
         tx += public_key.W_len;
         memcpy(G_io_apdu_buffer + tx, chain_code, 32);
         tx += 32;
 
         // get parent fingerprint
-        derive_keypair(path, 3, &private_key, &public_key, chain_code);
+        derive_keypair(&private_key, &public_key, NULL, 0);
         compress_public_key(public_key.W);
         hash160(public_key.W, 33, hash_160);
         // fingerprint is only first 4 bytes of hash

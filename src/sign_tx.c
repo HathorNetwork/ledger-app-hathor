@@ -26,16 +26,12 @@ typedef enum {
 // for confirming the change output. Returns false if not valid.
 bool verify_change_output(tx_output_t output, uint8_t index) {
     // bip32 path for 44'/280'/0'/0/key_index
-    uint32_t path[5];
-    uint8_t hash[32];
+    uint8_t hash[20];
     cx_ecfp_public_key_t public_key;
     cx_ecfp_private_key_t private_key;
-    memcpy(path, htr_bip44, 3*sizeof(uint32_t));
-    path[3] = 0;
-    path[4] = index;
 
-    // Get pubkey hash for path
-    derive_keypair(path, 5, &private_key, &public_key, NULL);
+    // get key pair for path 44'/280'/0'/0/index
+    derive_keypair(&private_key, &public_key, NULL, 2, 0, index);
     compress_public_key(public_key.W);
     hash160(public_key.W, 33, hash);
     // erase sensitive data
@@ -329,8 +325,6 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
 void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_length, volatile unsigned int *flags, volatile unsigned int *tx) {
     cx_ecfp_public_key_t public_key;
     cx_ecfp_private_key_t private_key;
-    // bip32 path for 44'/280'/0'/0/key_index
-    uint32_t path[5];
 
     if (p1 == 2) {
         // all done, go back to main menu
@@ -348,13 +342,8 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
         uint32_t key_index = U4BE(data_buffer, 0);
         PRINTF("sign tx with priv key %d\n", key_index);
 
-        // bip32 path for 44'/280'/0'/0/key_index
-        memcpy(path, htr_bip44, 3*sizeof(uint32_t));
-        path[3] = 0;
-        path[4] = key_index;
-
-        // Get key for path
-        derive_keypair(path, 5, &private_key, &public_key, NULL);
+        // get key pair for path 44'/280'/0'/0/key_index
+        derive_keypair(&private_key, &public_key, NULL, 2, 0, key_index);
 
         if (ctx->sighash_all[0] == '\0') {
             // finish the first hash of the data
