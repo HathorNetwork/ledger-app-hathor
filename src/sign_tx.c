@@ -91,7 +91,7 @@ void _decode_next_element() {
         uint8_t *buf = parse_output(ctx->buffer, ctx->buffer_len, &ctx->decoded_output);
         ctx->decoded_output.index = ctx->current_output;
         ctx->elem_type = ELEM_OUTPUT;
-        ctx->buffer_len -= buf - ctx->buffer;
+        ctx->buffer_len -= (buf - ctx->buffer);
         os_memmove(ctx->buffer, buf, ctx->buffer_len);
         ctx->current_output++;
         PRINTF("decoded output\n");
@@ -281,29 +281,23 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
         // scroll left by either clicking or pressing the left button
         case BUTTON_LEFT:
         case BUTTON_EVT_FAST | BUTTON_LEFT: // SEEK LEFT
-            if (ctx->display_index == 0) {
-                // we're at the beginning of an output
-                // TODO can return without UX_REDISPLAY?
-            } else {
+            if (ctx->display_index != 0) {
                 ctx->display_index--;
                 os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
+                UX_REDISPLAY();
             }
 
-            UX_REDISPLAY();
             break;
 
         // scroll right by either clicking or pressing the right button
         case BUTTON_RIGHT:
         case BUTTON_EVT_FAST | BUTTON_RIGHT: // SEEK RIGHT
-            if (ctx->display_index == strlen((const char*)ctx->info) - 12) {
-                // we're at the end of one of the outputs
-                // TODO can return without UX_REDISPLAY?
-            } else {
+            if (ctx->display_index != strlen((const char*)ctx->info) - 12) {
                 ctx->display_index++;
                 os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
+                UX_REDISPLAY();
             }
 
-            UX_REDISPLAY();
             break;
 
         case BUTTON_EVT_RELEASED | BUTTON_LEFT | BUTTON_RIGHT: // PROCEED TO NEXT OUTPUT
@@ -313,7 +307,9 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
                     THROW(SW_INVALID_PARAM);
                     break;
                 case TX_STATE_PARTIAL:
-                    THROW(SW_OK);
+                    // We don't have enough data to decode the next element; send an
+                    // OK code to request more.
+                    io_exchange_with_code(SW_OK, 0);
                     break;
                 case TX_STATE_READY:
                     //display element
@@ -327,7 +323,6 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
                     UX_REDISPLAY();
                     break;
                 case TX_STATE_FINISHED:
-                    // TODO is this really the last one?
                     // Go to confirmation screen
                     os_memmove(ctx->line1, "Send\0", 5);
                     os_memmove(ctx->line2, "transaction?\0", 13);
@@ -351,7 +346,10 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
     }
 
     if (p1 == 1) {
-        //TODO can only enter here after ctx->state == USER_APPROVED
+        if (ctx->state != USER_APPROVED) {
+            PRINTF("ERROR: trying to get signature before user approved tx\n");
+            THROW(SW_DEVELOPER_ERR);
+        }
 
         // asking for signature
         uint32_t key_index = U4BE(data_buffer, 0);
@@ -386,7 +384,7 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
         // we're receiving transaction data
         if (ctx->state == USER_APPROVED) {
             // can't receive more data after user's approval
-            PRINTF("user already approved\n");
+            PRINTF("ERROR: receiving more data after user already approved\n");
             THROW(SW_INVALID_PARAM);
         }
 
@@ -406,7 +404,6 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
             // the first chunk of data has the change output info
             uint8_t offset = parse_change_output_info(data_buffer, data_length);
             PRINTF("data length %d; offset %d\n", data_length, offset);
-            PRINTF("start of sighash %x %x\n", *(data_buffer + offset), *(data_buffer + offset + 1));
 
             // copy all remaining bytes to hash
             cx_hash(&ctx->sha256.header, 0, data_buffer + offset, data_length - offset, NULL, 0);
@@ -440,19 +437,23 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
         switch(decode_next_element()) {
             case TX_STATE_ERR:
                 THROW(SW_INVALID_PARAM);
-                break;
             case TX_STATE_PARTIAL:
-                break;
+                // We don't have enough data to decode the next element; send an
+                // OK code to request more.
+                THROW(SW_OK);
             case TX_STATE_READY:
                 //display element
                 prepare_display_output(ctx->decoded_output);
-
                 UX_DISPLAY(ui_sign_tx_compare, ui_prepro_sign_tx_compare);
                 *flags |= IO_ASYNCH_REPLY;
                 return;
             case TX_STATE_FINISHED:
-                // TODO is this really the last one?
-                break;
+                // Go to confirmation screen
+                os_memmove(ctx->line1, "Send\0", 5);
+                os_memmove(ctx->line2, "transaction?\0", 13);
+                UX_DISPLAY(ui_sign_tx_confirm, ui_prepro_sign_tx_confirm);
+                *flags |= IO_ASYNCH_REPLY;
+                return;
         }
 
         io_exchange_with_code(SW_OK, 0);

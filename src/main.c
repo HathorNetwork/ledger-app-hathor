@@ -177,8 +177,13 @@ static void hathor_main(void) {
                 // this is done; perhaps to handle single-byte exception
                 // codes?
 
-                // clear the global state so next requests are not impacted
-                os_memset(&global, 0, sizeof(global));
+                // Clear the global state so next requests are not impacted. Only
+                // needed when last exception was an error, because SW_OK may
+                // indicate we require more data from the wallet and need to keep
+                // the same state
+                if (e != SW_OK) {
+                    os_memset(&global, 0, sizeof(global));
+                }
 
                 switch (e & 0xF000) {
                 case 0x6000:
