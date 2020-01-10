@@ -16,14 +16,6 @@
 
 static sign_tx_context_t *ctx = &global.sign_tx_context;
 
-// indicates a transaction decoder status
-typedef enum {
-    TX_STATE_ERR = 1,  // invalid transaction (NOTE: it's illegal to THROW(0))
-    TX_STATE_PARTIAL,  // no elements have been fully decoded yet
-    TX_STATE_READY,    // at least one element is fully decoded
-    TX_STATE_FINISHED, // reached end of transaction
-} tx_decoder_state_e;
-
 typedef enum {
     ELEM_TOKEN_UID,
     ELEM_INPUT,
@@ -57,6 +49,7 @@ bool verify_change_output(tx_output_t output, uint8_t index) {
     return true;
 }
 
+// tries to decode an element from the context's buffer
 void _decode_next_element() {
     if (ctx->remaining_tokens > 0) {
         // read one token uid

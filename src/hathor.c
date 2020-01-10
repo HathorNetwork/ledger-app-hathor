@@ -76,38 +76,6 @@ void pubkey_to_address(cx_ecfp_public_key_t *public_key, uint8_t *out) {
     pubkey_hash_to_address(hash_buffer, out);
 }
 
-void init_tx(transaction_t *tx) {
-    tx->version = 0;
-    tx->tokens_len = 0;
-    tx->inputs_len = 0;
-    tx->outputs_len = 0;
-}
-
-/**
- * Parses a tx input from the input data. Returns a pointer to the end of parsed data.
- */
-uint8_t* parse_input(uint8_t *in, size_t inlen, tx_input_t *input) {
-    uint8_t *buf = in;
-    assert_length(35, inlen);   // tx_id (32 bytes) + index (1 byte) + data_len (2 bytes)
-    os_memcpy(input->tx_id, buf, 32);
-    buf += 32;
-    input->index = *buf;
-    buf++;
-    uint16_t data_len = U2BE(buf, 0);
-    buf += 2;
-    // we require the input data to be empty, as we're signing the whole
-    // bytes we get from the wallet (in sighash_all, inputs must have no data)
-    if (data_len > 0) {
-        THROW(SW_INVALID_PARAM);
-    }
-    /*
-    assert_length(data_len, inlen - 35);
-    // ignore input data for now
-    buf += data_len;
-    */
-    return buf;
-}
-
 /**
  * Validates that a script has the format of P2PKH. Throws an exception if doesn't.
  * P2PKH scripts have the format:
@@ -164,55 +132,6 @@ uint8_t* parse_output(uint8_t *in, size_t inlen, tx_output_t *output) {
     return buf;
 }
 
-uint8_t* parse_tx(uint8_t *in, size_t inlen, transaction_t *transaction) {
-    uint8_t *buf = in;
-    assert_length(5, inlen);    // version + tokens_len + inputs_len + outputs_len
-    transaction->version = U2BE(buf, 0);
-    buf += 2;
-    transaction->tokens_len = *buf;
-    buf++;
-    transaction->inputs_len = *buf;
-    buf++;
-    transaction->outputs_len = *buf;
-    buf++;
-    // skip reading tokens
-    assert_length(32*transaction->tokens_len, inlen - 5);
-    buf += 32*transaction->tokens_len;
-    // read inputs
-    for (int i = 0; i < transaction->inputs_len; i++) {
-        buf = parse_input(buf, (in + inlen - buf), &(transaction->inputs[i]));
-    }
-
-    for (int i = 0; i < transaction->outputs_len; i++) {
-        buf = parse_output(buf, (in + inlen - buf), &(transaction->outputs[i]));
-    }
-    return buf;
-}
-
-void print_input(tx_input_t input, uint8_t index) {
-    PRINTF("input %u: index %u\n", index, input.index);
-}
-
-void print_output(tx_output_t output, uint8_t index) {
-    PRINTF("output %u: token_data %u\n", index, output.token_data);
-}
-
-void print_tx(transaction_t transaction) {
-    PRINTF("\n-------- TRANSACTION --------\n");
-    PRINTF("version: %u\n", transaction.version);
-    PRINTF("tokens_len: %u\n", transaction.tokens_len);
-    PRINTF("inputs_len: %u\n", transaction.inputs_len);
-    PRINTF("outputs_len: %u\n", transaction.outputs_len);
-    uint8_t i = 0;
-    for (i = 0; i < transaction.inputs_len; i++) {
-        print_input(transaction.inputs[i], i);
-    }
-    for (i = 0; i < transaction.outputs_len; i++) {
-        print_output(transaction.outputs[i], i);
-    }
-    PRINTF("-----------------------------\n");
-}
-
 void format_value(uint64_t value, unsigned char *out) {
     // first deal with the part to the left of the decimal separator
     uint64_t tmp = value / 100;
@@ -246,7 +165,6 @@ void format_value(uint64_t value, unsigned char *out) {
 
 void assert_length(size_t smaller, size_t larger) {
     if (smaller > larger) {
-        //THROW(SW_INVALID_PARAM);
-        THROW(2);   //TODO TX_STATE_PARTIAL
+        THROW(TX_STATE_PARTIAL);
     }
 }

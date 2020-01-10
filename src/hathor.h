@@ -19,11 +19,6 @@
  */
 extern const uint32_t htr_bip44[3];
 
-typedef struct {
-    uint8_t tx_id[32];
-    uint8_t index;
-} tx_input_t;
-
 // TODO only p2pkh and HTR for now
 // TODO add timelock
 typedef struct {
@@ -34,15 +29,13 @@ typedef struct {
     uint8_t pubkey_hash[20];
 } tx_output_t;
 
-typedef struct {
-    uint16_t version;
-    uint8_t tokens_len;
-    //uint32_t tokens[5];
-    uint8_t inputs_len;
-    tx_input_t inputs[10];
-    uint8_t outputs_len;
-    tx_output_t outputs[10];
-} transaction_t;
+// indicates a transaction decoder status
+typedef enum {
+    TX_STATE_ERR = 1,  // invalid transaction (NOTE: it's illegal to THROW(0))
+    TX_STATE_PARTIAL,  // no elements have been fully decoded yet
+    TX_STATE_READY,    // at least one element is fully decoded
+    TX_STATE_FINISHED, // reached end of transaction
+} tx_decoder_state_e;
 
 /**
  * Get the private/public keys and chain code for the desired path.
@@ -135,42 +128,9 @@ void pubkey_hash_to_address(uint8_t *public_key_hash, uint8_t *out);
  */
 void pubkey_to_address(cx_ecfp_public_key_t *public_key, uint8_t *out);
 
-/**
- * Inititalizes a transaction struct, which basically sets some of its
- * values to 0.
- *
- * @param [out] transaction
- *   transaction struct to be initialized.
- *
- */
-void init_tx(transaction_t *transaction);
-
-/*
- * Assemble a transaction object from a sequence of bytes.
- *
- * @param  [in] in
- *   Input data.
- *
- * @param  [in] inlen
- *   Length of the input data.
- *
- * @param [out] transaction
- *   Transaction object with the information parsed from the data.
- *
- */
-uint8_t* parse_tx(uint8_t *in, size_t inlen, transaction_t *transaction);
 
 //TODO docstring
 uint8_t* parse_output(uint8_t *in, size_t inlen, tx_output_t *output);
-
-/**
- * Print basic information about a transaction. Used for debugging.
- *
- * @param  [in] transaction
- *   Transaction to be displayed.
- *
- */
-void print_tx(transaction_t transaction);
 
 /**
  * Returns the NULL-terminated string representation of an integer value,
