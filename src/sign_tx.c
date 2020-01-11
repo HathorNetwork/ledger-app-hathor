@@ -293,7 +293,8 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
             ctx->display_index = 0;
             switch(decode_next_element()) {
                 case TX_STATE_ERR:
-                    THROW(SW_INVALID_PARAM);
+                    io_exchange_with_code(SW_INVALID_PARAM, 0);
+                    ui_idle();
                     break;
                 case TX_STATE_PARTIAL:
                     // We don't have enough data to decode the next element; send an
@@ -335,7 +336,9 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
     if (p1 == 1) {
         if (ctx->state != USER_APPROVED) {
             PRINTF("ERROR: trying to get signature before user approved tx\n");
-            THROW(SW_DEVELOPER_ERR);
+            io_exchange_with_code(SW_DEVELOPER_ERR, 0);
+            ui_idle();
+            return;
         }
 
         // asking for signature
@@ -367,7 +370,9 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
         if (ctx->state == USER_APPROVED) {
             // can't receive more data after user's approval
             PRINTF("ERROR: receiving more data after user already approved\n");
-            THROW(SW_INVALID_PARAM);
+            io_exchange_with_code(SW_INVALID_PARAM, 0);
+            ui_idle();
+            return;
         }
 
         if (ctx->state == UNINITIALIZED) {
@@ -418,7 +423,9 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
         // at this point, ctx->buffer has bytes to be decoded
         switch(decode_next_element()) {
             case TX_STATE_ERR:
-                THROW(SW_INVALID_PARAM);
+                io_exchange_with_code(SW_INVALID_PARAM, 0);
+                ui_idle();
+                break;
             case TX_STATE_PARTIAL:
                 // We don't have enough data to decode the next element; send an
                 // OK code to request more.
@@ -437,7 +444,5 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
                 *flags |= IO_ASYNCH_REPLY;
                 return;
         }
-
-        io_exchange_with_code(SW_OK, 0);
     }
 }
