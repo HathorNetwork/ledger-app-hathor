@@ -168,11 +168,12 @@ static void prepare_display_output(tx_output_t output) {
     format_value(output.value, ctx->info + len + 5);
 
     // line1
-    // we subtract 1 because output indexes start at 0; if there's change output, subtract one more
-    uint8_t total_outputs = ctx->has_change_output ? ctx->outputs_len - 2 : ctx->outputs_len - 1;
-    // fake_output_index is used to display contiguous indexes to the user when there's change output
+    // if there's change output, subtract one
+    uint8_t total_outputs = ctx->has_change_output ? ctx->outputs_len - 1 : ctx->outputs_len;
+    // fake_output_index is used to display consecutive indexes to the user when there's change output.
+    // Output indexes start at 0, so add 1 to start on 1
     uint8_t fake_output_index = (ctx->has_change_output && ctx->decoded_output.index < ctx->change_output_index)
-        ? ctx->decoded_output.index : ctx->decoded_output.index - 1;
+        ? ctx->decoded_output.index + 1 : ctx->decoded_output.index;
     os_memmove(ctx->line1, "Output ", 7);
     itoa(fake_output_index, ctx->line1 + 7, 10);
     len = strlen(ctx->line1);
