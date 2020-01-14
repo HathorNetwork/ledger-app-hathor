@@ -17,6 +17,13 @@
 #define U8LE(buf, off) (((uint64_t)(U4LE(buf, off + 4)) << 32) | ((uint64_t)(U4LE(buf, off))     & 0xFFFFFFFF))
 
 /**
+ * All keys that we derive start with path 44'/280'/0'.
+ *
+ * 280 is Hathor's BIP44 code: https://github.com/satoshilabs/slips/blob/master/slip-0044.md
+ */
+extern const uint32_t htr_bip44[3];
+
+/**
  * Converts a binary to hexadecimal string and appends a final NULL byte.
  *
  * @param  [in] data
@@ -72,6 +79,21 @@ void derive_keypair(
     unsigned char *chain_code);
 
 /**
+ * Performs the sha256d (double sha256) of the data.
+ *
+ * @param  [in] in
+ *   Input data to be hashed.
+ *
+ * @param  [in] inlen
+ *   Length of input data.
+ *
+ * @param [out] out
+ *   sha256d of input data. Should have at least 32 bytes.
+ *
+ */
+void sha256d(unsigned char *in, size_t inlen, unsigned char *out);
+
+/**
  * Performs the hash160 (sha256 + ripemd160) of the data
  *
  * @param  [in] in
@@ -81,10 +103,10 @@ void derive_keypair(
  *   Length of input data.
  *
  * @param [out] out
- *   Hash160 of input data. Should have at least 20 bytes.
+ *   hash160 of input data. Should have at least 20 bytes.
  *
  */
-void hash160(unsigned char *in, unsigned short inlen, unsigned char *out);
+void hash160(unsigned char *in, size_t inlen, unsigned char *out);
 
 /**
  * Performs the hash160 (sha256 + ripemd160) of the data
@@ -96,3 +118,35 @@ void hash160(unsigned char *in, unsigned short inlen, unsigned char *out);
  *
  */
 void compress_public_key(unsigned char *value);
+
+/**
+ * Encodes in base58.
+ *
+ * @param  [in] in
+ *   Input data to be encoded.
+ *
+ * @param  [in] inlen
+ *   Length of input data.
+ *
+ * @param [out] out
+ *   Base58 of input data
+ *
+ * @param [in] outlen
+ *   Size of the output buffer. If it's not enough to hold the encoded
+ *   data, will return error (-1).
+ *
+ * @return the length of the base58 encoded data or -1 if there's an error
+ */
+int encode_base58(const unsigned char *in, size_t inlen, unsigned char *out, size_t outlen);
+
+/**
+ * Derives the address (as bytes, not base58) from a public key.
+ *
+ * @param  [in] public_key
+ *   The public key.
+ *
+ * @param [out] out
+ *   Address for the given public key.
+ *
+ */
+void pubkey_to_address(cx_ecfp_public_key_t *public_key, uint8_t *out);

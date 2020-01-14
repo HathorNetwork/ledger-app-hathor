@@ -15,6 +15,7 @@
 // These are global variables declared in ux.h. They can't be defined there
 // because multiple files include ux.h; they need to be defined in exactly one
 // place. See ux.h for their descriptions.
+commandContext global;
 ux_state_t ux;
 
 // Here we define the main menu, using the Ledger-provided menu API. This menu
@@ -71,6 +72,7 @@ void io_exchange_with_code(uint16_t code, uint16_t tx) {
 // which command should be executed. We'll use this code to dispatch on a
 // table of function pointers.
 #define INS_GET_VERSION     0x01
+#define INS_GET_ADDRESS     0x02
 #define INS_GET_XPUB        0x10
 
 // This is the function signature for a command handler. 'flags' and 'tx' are
@@ -80,11 +82,13 @@ void io_exchange_with_code(uint16_t code, uint16_t tx) {
 typedef void handler_fn_t(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint16_t dataLength, volatile unsigned int *flags, volatile unsigned int *tx);
 
 handler_fn_t handleGetVersion;
+handler_fn_t handleGetAddress;
 handler_fn_t handleGetXPub;
 
 static handler_fn_t* lookupHandler(uint8_t ins) {
     switch (ins) {
     case INS_GET_VERSION:    return handleGetVersion;
+    case INS_GET_ADDRESS:    return handleGetAddress;
     case INS_GET_XPUB:       return handleGetXPub;
     default:                 return NULL;
     }
