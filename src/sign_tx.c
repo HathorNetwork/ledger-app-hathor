@@ -39,7 +39,6 @@ bool verify_change_output(tx_output_t output, uint8_t index) {
     explicit_bzero(&public_key, sizeof(public_key));
     if (os_memcmp(hash, output.pubkey_hash, 20) != 0) {
         // not the same
-        PRINTF("change output pubkey hash does not match given index\n");
         return false;
     }
     return true;
@@ -50,7 +49,6 @@ void _decode_next_element() {
     if (ctx->remaining_tokens > 0) {
         // read one token uid
         if (ctx->buffer_len < 32) {
-            PRINTF("partial tokens, buffer len %d\n", ctx->buffer_len);
             THROW(TX_STATE_PARTIAL);
         }
         // for now, we ignore it
@@ -58,11 +56,9 @@ void _decode_next_element() {
         ctx->buffer_len -= 32;
         ctx->elem_type = ELEM_TOKEN_UID;
         os_memmove(ctx->buffer, ctx->buffer + 32, ctx->buffer_len);
-        PRINTF("decoded token\n");
     } else if (ctx->remaining_inputs > 0) {
         // read input
         if (ctx->buffer_len < 35) {     // tx_id (32 bytes) + index (1 byte) + data_len (2 bytes)
-            PRINTF("partial inputs, buffer len %d\n", ctx->buffer_len);
             THROW(TX_STATE_PARTIAL);
         }
         // we require the input data to be empty because we're signing the whole
@@ -75,10 +71,8 @@ void _decode_next_element() {
         ctx->buffer_len -= 35;
         ctx->elem_type = ELEM_INPUT;
         os_memmove(ctx->buffer, ctx->buffer + 35, ctx->buffer_len);
-        PRINTF("decoded input\n");
     } else if (ctx->current_output < ctx->outputs_len) {
         uint8_t *buf = parse_output(ctx->buffer, ctx->buffer_len, &ctx->decoded_output);
-        PRINTF("decoded output\n");
         ctx->decoded_output.index = ctx->current_output;
         ctx->elem_type = ELEM_OUTPUT;
         ctx->buffer_len -= (buf - ctx->buffer);
@@ -129,7 +123,6 @@ tx_decoder_state_e decode_next_element() {
         }
     }
     END_TRY;
-    PRINTF("decode_next_element result %d\n", result);
     return result;
 }
 
@@ -168,12 +161,19 @@ static void prepare_display_output(tx_output_t output) {
     format_value(output.value, ctx->info + len + 5);
 
     // line1
-    // if there's change output, subtract one
-    uint8_t total_outputs = ctx->has_change_output ? ctx->outputs_len - 1 : ctx->outputs_len;
-    // fake_output_index is used to display consecutive indexes to the user when there's change output.
-    // Output indexes start at 0, so add 1 to start on 1
-    uint8_t fake_output_index = (ctx->has_change_output && ctx->decoded_output.index < ctx->change_output_index)
-        ? ctx->decoded_output.index + 1 : ctx->decoded_output.index;
+    uint8_t total_outputs = ctx->outputs_len;
+    // fake_output_index is used to display consecutive indexes to the user when there's
+    // change output. Also, output indexes start at 0, so add 1 to start on 1
+    uint8_t fake_output_index = ctx->decoded_output.index + 1;
+    if (ctx->has_change_output) {
+        // change output is not shown to user
+        // if there's change output, subtract one
+        total_outputs = ctx->outputs_len - 1;
+        if (ctx->decoded_output.index > ctx->change_output_index) {
+            // outputs after the change output don't need to add 1
+            fake_output_index = ctx->decoded_output.index;
+        }
+    }
     os_memmove(ctx->line1, "Output ", 7);
     itoa(fake_output_index, ctx->line1 + 7, 10);
     len = strlen(ctx->line1);
@@ -307,7 +307,6 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
                     if (ctx->elem_type == ELEM_OUTPUT) {
                         prepare_display_output(ctx->decoded_output);
                     } else {
-                        PRINTF("ERROR: Display element is not output!!");
                         THROW(SW_INVALID_PARAM);
                     }
 
@@ -336,7 +335,6 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
 
     if (p1 == 1) {
         if (ctx->state != USER_APPROVED) {
-            PRINTF("ERROR: trying to get signature before user approved tx\n");
             io_exchange_with_code(SW_DEVELOPER_ERR, 0);
             ui_idle();
             return;
@@ -344,7 +342,6 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
 
         // asking for signature
         uint32_t key_index = U4BE(data_buffer, 0);
-        PRINTF("sign tx with priv key %d\n", key_index);
 
         // get key pair for path 44'/280'/0'/0/key_index
         derive_keypair(&private_key, &public_key, NULL, 2, 0, key_index);
@@ -370,14 +367,12 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
         // we're receiving transaction data
         if (ctx->state == USER_APPROVED) {
             // can't receive more data after user's approval
-            PRINTF("ERROR: receiving more data after user already approved\n");
             io_exchange_with_code(SW_INVALID_PARAM, 0);
             ui_idle();
             return;
         }
 
         if (ctx->state == UNINITIALIZED) {
-            PRINTF("initializing\n");
             // starting new tx; not initialized yet
             ctx->state = RECEIVING_DATA;
             ctx->buffer_len = 0;
@@ -391,7 +386,6 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
 
             // the first chunk of data has the change output info
             uint8_t offset = parse_change_output_info(data_buffer, data_length);
-            PRINTF("data length %d; offset %d\n", data_length, offset);
 
             // copy all remaining bytes to hash
             cx_hash(&ctx->sha256.header, 0, data_buffer + offset, data_length - offset, NULL, 0);
@@ -407,12 +401,10 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
             ctx->outputs_len = data_buffer[offset];
             offset++;
 
-            PRINTF("tx tokens %d inputs %d outputs %d\n", ctx->remaining_tokens, ctx->remaining_inputs, ctx->outputs_len);
             // copy remaining bytes to decode buffer
             ctx->buffer_len = data_length - offset;
             os_memcpy(ctx->buffer, data_buffer + offset, ctx->buffer_len);
         } else {
-            PRINTF("got more data: %d bytes\n", data_length);
             // add it to the hash
             cx_hash(&ctx->sha256.header, 0, data_buffer, data_length, NULL, 0);
 
