@@ -88,6 +88,7 @@ void pubkey_to_address(cx_ecfp_public_key_t *public_key, uint8_t *out) {
 }
 
 /**
+ * XXX considering only p2pkh, without timelock
  * Validates that a script has the format of P2PKH. Throws an exception if doesn't.
  * P2PKH scripts have the format:
  *   [OP_DUP, OP_HASH160, pubkey_hash_len, pubkey_hash, OP_EQUALVERIFY, OP_CHECKSIG]
@@ -136,7 +137,6 @@ uint8_t* parse_output(uint8_t *in, size_t inlen, tx_output_t *output) {
     uint16_t script_len = U2BE(buf, 0);
     buf += 2;
     assert_length(script_len, inlen - 7);
-    //XXX considering only p2pkh, without timelock
     validate_p2pkh_script(buf);
     os_memcpy(output->pubkey_hash, buf+3, 20);
     buf += script_len;
