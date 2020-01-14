@@ -39,7 +39,7 @@ static const bagl_element_t* ui_prepro_getAddress_compare(const bagl_element_t *
         return (ctx->displayIndex == 0) ? NULL : element;
     case 2:
         // 0x02 is the right, so return NULL if we're displaying the end of the text.
-        return (ctx->displayIndex == sizeof(ctx->b58_address)-12) ? NULL : element;
+        return (ctx->displayIndex == sizeof(ctx->b58_address) - MAX_SCREEN_LENGTH) ? NULL : element;
     default:
         // Always display all other elements.
         return element;
@@ -56,17 +56,17 @@ static unsigned int ui_getAddress_compare_button(unsigned int button_mask, unsig
         if (ctx->displayIndex > 0) {
             ctx->displayIndex--;
         }
-        os_memmove(ctx->partialAddress, ctx->b58_address+ctx->displayIndex, 12);
+        os_memmove(ctx->partialAddress, ctx->b58_address+ctx->displayIndex, MAX_SCREEN_LENGTH);
         UX_REDISPLAY();
         break;
 
     // scroll right by either clicking or pressing the right button
     case BUTTON_RIGHT:
     case BUTTON_EVT_FAST | BUTTON_RIGHT: // SEEK RIGHT
-        if (ctx->displayIndex < sizeof(ctx->b58_address)-12) {
+        if (ctx->displayIndex < sizeof(ctx->b58_address) - MAX_SCREEN_LENGTH) {
             ctx->displayIndex++;
         }
-        os_memmove(ctx->partialAddress, ctx->b58_address+ctx->displayIndex, 12);
+        os_memmove(ctx->partialAddress, ctx->b58_address+ctx->displayIndex, MAX_SCREEN_LENGTH);
         UX_REDISPLAY();
         break;
 
@@ -102,8 +102,8 @@ void handleGetAddress(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint16_t data
     }
 
     // move the first 12 characters into the partialAddress buffer.
-    os_memmove(ctx->partialAddress, ctx->b58_address, 12);
-    ctx->partialAddress[12] = '\0';
+    os_memmove(ctx->partialAddress, ctx->b58_address, MAX_SCREEN_LENGTH);
+    ctx->partialAddress[MAX_SCREEN_LENGTH] = '\0';
     ctx->displayIndex = 0;
 
     UX_DISPLAY(ui_getAddress_compare, ui_prepro_getAddress_compare);

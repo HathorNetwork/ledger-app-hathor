@@ -15,7 +15,8 @@
 #include "util.h"
 
 // All keys that we derive start with path 44'/280'/0'
-const uint32_t htr_bip44[] = { 44 | 0x80000000, 280 | 0x80000000, 0 | 0x80000000 };
+// We make `| 0x80000000` for hardened keys
+const uint32_t htr_bip44[] = { 44 | 0x80000000, HATHOR_BIP44_CODE | 0x80000000, 0 | 0x80000000 };
 
 void derive_keypair(
     cx_ecfp_private_key_t *private_key,
