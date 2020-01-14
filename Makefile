@@ -54,6 +54,8 @@ DEFINES += HAVE_BAGL HAVE_SPRINTF
 DEFINES += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=7 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
 DEFINES += APPVERSION=\"$(APPVERSION)\"
 DEFINES += P2PKH_VERSION_BYTE=$(P2PKH_VERSION_BYTE)
+# this enables the PRINTF macro, used for debugging
+# https://ledger.readthedocs.io/en/latest/userspace/debugging.html#printf-macro
 #DEFINES += HAVE_SPRINTF HAVE_PRINTF PRINTF=screen_printf
 
 ##############
