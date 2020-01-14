@@ -209,7 +209,13 @@ static uint8_t parse_change_output_info(uint8_t *in, size_t inlen) {
 }
 
 /*
- * Prepare the output information that will be displayed.
+ * Prepare the output information that will be displayed. We use 2 lines:
+ *   Output 1/3
+ *   HHVnn9mr8yPReovgt7AoeJRgS5QoXMa5fo HTR 12.00
+ *
+ * The second line is always scrollable, as it doesn't fit Ledger's display.
+ * First line shows the current output index and total outputs, not considering
+ * the change output. Indexes start at 1.
  */
 static void prepare_display_output(tx_output_t output) {
     // first prepare the address + value line
