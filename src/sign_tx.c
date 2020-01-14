@@ -5,6 +5,65 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+/*
+ * The sign tx command is a bit more complex than the others, mostly
+ * due to the transaction parsing. It requires multiple iterations from
+ * the wallet to complete and we use p1 values to track this communication.
+ *
+ * On the first packet received, it has the change output info, if one exists.
+ * If there's no change output, it's just the byte 0x00. Otherwise, it expects
+ * any non 0x00 value, followed by the change output index (1 byte) and the key
+ * index (4 bytes) that the change is supposed to be sent to. This information
+ * is used to confirmed that the change is indeed being sent to an address from
+ * this wallet. Eg: 
+ *      [0x01, 0x03, 0x00, 0x00, 0x00, 0x05]
+ *
+ *      . 0x01 - indicates there's a change output
+ *      . 0x03 - change is output with index 3 (output index start at 0)
+ *      . [0x00, 0x00, 0x00, 0x05] - change is sent to key with index 5 (44'/280'/0'/0/5)
+ *
+ * Immediately after the change output info, still in the first packet, we start
+ * receiving the sighash_all data for the transaction. This is the data that will
+ * be signed by Ledger so the inputs can be spent. This data may be very large
+ * and it may take multiple packets to receive all the information, as the
+ * communication protocol only allows 255 bytes to be passed at a time between
+ * Ledger and the wallet. All these initial packets (change output info + sighash_all)
+ * use p1 = 0.
+ *
+ * The code on sign_tx parses the sighash_all data to display information about
+ * the transaction to the user. Currently, we only display output info, but we
+ * will include token information in the future.
+ *
+ * The data is parsed iteratively until everything is received from the wallet.
+ * This means that in the first packet we may only have data available for the
+ * first 2 outputs and the data for the third one is truncated. We display and
+ * confirm with the user these 2 outputs and proceed to request more data from
+ * the wallet to display the remaining outputs.
+ *
+ * If there's a change output on this transaction, it is not shown to the user.
+ * Usually, change outputs are calculated automatically by the wallet, so it
+ * would be confusing to display them to the user. We do, however, verify that
+ * the change output actually sends the value to an address belonging to this
+ * wallet, so there's no harm in 'hiding' this output from the user.
+ *
+ * After we receive all data and the user confirms all outputs, a final screen
+ * is displayed asking whether the user wants to sign the tx. If he agrees, we
+ * send this info back to the wallet and expect to receive in the next packet(s)
+ * the key index to sign the sighash_all data. Each packet from this point on
+ * corresponds to a request to sign the data with the corresponding key and use
+ * p1 = 1. We reply to each request with the signature for the given key. When
+ * the wallet collects all signatures it needs, it sends a packet saying that
+ * all is done (p1 = 2). Ledger will then go back to the main display.
+ *
+ * Summary:
+ *
+ * | p1 | Data
+ * |----|------------------------------------
+ * | 0  | Change output info and sighash_all, up to 255 bytes at a time
+ * | 1  | Key index to sign the sighash data (4 bytes)
+ * | 2  | None
+ */
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <os.h>
