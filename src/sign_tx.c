@@ -246,8 +246,8 @@ static void prepare_display_output(tx_output_t output) {
     itoa(total_outputs, ctx->line1 + len, 10);
 
     // line2
-    os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
-    ctx->line2[12] = '\0';
+    os_memmove(ctx->line2, ctx->info + ctx->display_index, MAX_SCREEN_LENGTH);
+    ctx->line2[MAX_SCREEN_LENGTH] = '\0';
 }
 
 static const bagl_element_t* ui_prepro_sign_tx_confirm(const bagl_element_t *element) {
@@ -323,7 +323,7 @@ static const bagl_element_t* ui_prepro_sign_tx_compare(const bagl_element_t *ele
         return (ctx->display_index == 0) ? NULL : element;
     case 2:
         // 0x02 is the right, so return NULL if we're displaying the end of the text.
-        return ctx->display_index == (strlen((const char*)ctx->info) - 12) ? NULL : element;
+        return ctx->display_index == (strlen((const char*)ctx->info) - MAX_SCREEN_LENGTH) ? NULL : element;
     default:
         // Always display all other elements.
         return element;
@@ -338,7 +338,7 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
         case BUTTON_EVT_FAST | BUTTON_LEFT: // SEEK LEFT
             if (ctx->display_index != 0) {
                 ctx->display_index--;
-                os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
+                os_memmove(ctx->line2, ctx->info + ctx->display_index, MAX_SCREEN_LENGTH);
                 UX_REDISPLAY();
             }
 
@@ -347,9 +347,9 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
         // scroll right by either clicking or pressing the right button
         case BUTTON_RIGHT:
         case BUTTON_EVT_FAST | BUTTON_RIGHT: // SEEK RIGHT
-            if (ctx->display_index != strlen((const char*)ctx->info) - 12) {
+            if (ctx->display_index != strlen((const char*)ctx->info) - MAX_SCREEN_LENGTH) {
                 ctx->display_index++;
-                os_memmove(ctx->line2, ctx->info + ctx->display_index, 12);
+                os_memmove(ctx->line2, ctx->info + ctx->display_index, MAX_SCREEN_LENGTH);
                 UX_REDISPLAY();
             }
 

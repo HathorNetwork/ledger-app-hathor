@@ -61,7 +61,7 @@ typedef struct {
     uint8_t display_index;
     // NULL-terminated string for display
     char line1[15];
-    char line2[13];
+    char line2[MAX_SCREEN_LENGTH + 1];
 } sign_tx_context_t;
 
 // To save memory, we store all the context types in a single global union,
