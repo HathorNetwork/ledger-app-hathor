@@ -10,35 +10,6 @@
 #define U8LE(buf, off) (((uint64_t)(U4LE(buf, off + 4)) << 32) | ((uint64_t)(U4LE(buf, off))     & 0xFFFFFFFF))
 
 /**
- * Converts a binary to hexadecimal string and appends a final NULL byte.
- *
- * @param  [in] data
- *   The binary data.
- *
- * @param  [in] inlen
- *   Length of input data.
- *
- * @param [out] dst
- *   Array to store the string.
- *
- */
-void bin2hex(uint8_t *dst, uint8_t *data, uint64_t inlen);
-
-/**
- * Converts an unsigned integer to a decimal string and appends a final NULL
- * byte. It returns the length of the string.
- *
- * @param  [in] n
- *   Unsigned integer to be converted.
- *
- * @param [out] dst
- *   Array to store the string.
- *
- * @return length of destination string
- */
-int bin2dec(uint8_t *dst, uint64_t n);
-
-/**
  * Encodes in base58.
  *
  * @param  [in] in
