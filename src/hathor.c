@@ -152,6 +152,7 @@ void format_value(uint64_t value, unsigned char *out) {
     char *p;
 
     utoa(tmp, buf);
+    // 'c' is used here to control when a comma should be added
     c = 2 - strlen(buf) % 3;
     for (p = buf; *p != 0; p++) {
        *out++ = *p;
@@ -162,8 +163,10 @@ void format_value(uint64_t value, unsigned char *out) {
     }
     *--out = 0;
 
-    // now the part to the right
+    // now the part to the right of the decimal separator
     tmp = value % 100;
+    // reusing 'c' variable to point to the end of string, to add decimal
+    // separator and possibly pad with 0
     c = strlen((const char*)out);
     out[c++] = '.';
     if (tmp < 10) {
