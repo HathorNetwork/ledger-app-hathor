@@ -93,11 +93,10 @@ void pubkey_to_address(cx_ecfp_public_key_t *public_key, uint8_t *out) {
  * Validates that a script has the format of P2PKH. Throws an exception if doesn't.
  * P2PKH scripts have the format:
  *   [OP_DUP, OP_HASH160, pubkey_hash_len, pubkey_hash, OP_EQUALVERIFY, OP_CHECKSIG]
- * Considering that pubkey hashes have 20 bytes and the values of the opcodes:
- *   [0x76, 0xA9, 20, pubkey_hash, 0x88, 0xAC]
  */
 void validate_p2pkh_script(uint8_t *in) {
-    uint8_t p2pkh[] = {0x76, 0xA9, 20, 0x88, 0xAC};
+    // pubkey hashes have 20 bytes
+    uint8_t p2pkh[] = {OP_DUP, OP_HASH160, 20, OP_EQUALVERIFY, OP_CHECKSIG};
     if (os_memcmp(p2pkh, in, 3) != 0 || os_memcmp(p2pkh + 3, in + 23, 2) !=0) {
         THROW(SW_INVALID_PARAM);
     }

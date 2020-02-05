@@ -12,6 +12,13 @@
 #define SW_USER_REJECTED 0x6985
 #define SW_OK            0x9000
 
+// opcodes
+#define OP_DUP          0x76
+#define OP_EQUALVERIFY  0x88
+#define OP_HASH160      0xA9
+#define OP_CHECKSIG     0xAC
+
+
 /**
  * All keys that we derive start with path 44'/280'/0'.
  *
