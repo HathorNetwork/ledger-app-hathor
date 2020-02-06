@@ -390,10 +390,33 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
     return 0;
 }
 
-void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_length, volatile unsigned int *flags, volatile unsigned int *tx) {
+// signs the data on sighash_all with the requested key, given by its index. It places
+// the result directly on G_io_apdu_buffer and sends
+void sign_with_key(uint32_t key_index) {
     cx_ecfp_public_key_t public_key;
     cx_ecfp_private_key_t private_key;
 
+    // get key pair for path 44'/280'/0'/0/key_index
+    derive_keypair(&private_key, &public_key, NULL, 2, 0, key_index);
+
+    if (ctx->sighash_all[0] == '\0') {
+        // finish the first hash of the data
+        cx_hash(&ctx->sha256.header, CX_LAST, ctx->sighash_all, 0, ctx->sighash_all, 32);
+        // now get second sha256 of data
+        cx_sha256_init(&ctx->sha256);
+        cx_hash(&ctx->sha256.header, CX_LAST, ctx->sighash_all, 32, ctx->sighash_all, 32);
+    }
+    // sign message (sha256d of sighash_all data)
+    int sig_size = cx_ecdsa_sign(&private_key, CX_LAST | CX_RND_RFC6979, CX_SHA256, ctx->sighash_all, 32, G_io_apdu_buffer, 256, NULL);
+
+    // erase sensitive data
+    explicit_bzero(&private_key, sizeof(private_key));
+    explicit_bzero(&public_key, sizeof(public_key));
+
+    io_exchange_with_code(SW_OK, sig_size);
+}
+
+void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_length, volatile unsigned int *flags, volatile unsigned int *tx) {
     if (p1 == 2) {
         // all done, go back to main menu
         io_exchange_with_code(SW_OK, 0);
@@ -401,33 +424,16 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
     }
 
     if (p1 == 1) {
+        // asking for signature
         if (ctx->state != USER_APPROVED) {
+            // the user must have approved already
             io_exchange_with_code(SW_DEVELOPER_ERR, 0);
             ui_idle();
             return;
         }
 
-        // asking for signature
         uint32_t key_index = U4BE(data_buffer, 0);
-
-        // get key pair for path 44'/280'/0'/0/key_index
-        derive_keypair(&private_key, &public_key, NULL, 2, 0, key_index);
-
-        if (ctx->sighash_all[0] == '\0') {
-            // finish the first hash of the data
-            cx_hash(&ctx->sha256.header, CX_LAST, ctx->sighash_all, 0, ctx->sighash_all, 32);
-            // now get second sha256 of data
-            cx_sha256_init(&ctx->sha256);
-            cx_hash(&ctx->sha256.header, CX_LAST, ctx->sighash_all, 32, ctx->sighash_all, 32);
-        }
-        // sign message (sha256d of sighash_all data)
-        int sig_size = cx_ecdsa_sign(&private_key, CX_LAST | CX_RND_RFC6979, CX_SHA256, ctx->sighash_all, 32, G_io_apdu_buffer, 256, NULL);
-
-        // erase sensitive data
-        explicit_bzero(&private_key, sizeof(private_key));
-        explicit_bzero(&public_key, sizeof(public_key));
-
-        io_exchange_with_code(SW_OK, sig_size);
+        sign_with_key(key_index);
     }
 
     if (p1 == 0) {
