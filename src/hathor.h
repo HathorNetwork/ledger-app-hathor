@@ -38,10 +38,10 @@ typedef struct {
 
 // indicates a transaction decoder status
 typedef enum {
-    TX_STATE_ERR = 1,  // invalid transaction (NOTE: it's illegal to THROW(0))
-    TX_STATE_PARTIAL,  // no elements have been fully decoded yet
-    TX_STATE_READY,    // at least one element is fully decoded
-    TX_STATE_FINISHED, // reached end of transaction
+    TX_STATE_ERR = 1,           // invalid transaction (NOTE: it's illegal to THROW(0))
+    TX_STATE_PARTIAL = 2,       // no elements have been fully decoded yet
+    TX_STATE_READY = 3,         // at least one element is fully decoded
+    TX_STATE_FINISHED = 4,      // reached end of transaction
 } tx_decoder_state_e;
 
 /**
