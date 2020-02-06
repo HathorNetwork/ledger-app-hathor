@@ -14,7 +14,7 @@
  * If there's no change output, it's just the byte 0x00. Otherwise, it expects
  * any non 0x00 value, followed by the change output index (1 byte) and the key
  * index (4 bytes) that the change is supposed to be sent to. This information
- * is used to confirmed that the change is indeed being sent to an address from
+ * is used to confirm that the change is indeed being sent to an address from
  * this wallet. Eg: 
  *      [0x01, 0x03, 0x00, 0x00, 0x00, 0x05]
  *
@@ -44,7 +44,8 @@
  * Usually, change outputs are calculated automatically by the wallet, so it
  * would be confusing to display them to the user. We do, however, verify that
  * the change output actually sends the value to an address belonging to this
- * wallet, so there's no harm in 'hiding' this output from the user.
+ * wallet, so there's no harm in 'hiding' this output from the user. This is
+ * done in `verify_change_output`.
  *
  * After we receive all data and the user confirms all outputs, a final screen
  * is displayed asking whether the user wants to sign the tx. If he agrees, we
@@ -81,8 +82,9 @@ typedef enum {
     ELEM_OUTPUT,
 } tx_element_type_e;
 
-// verifies an output sends its funds to a given key index. Used
-// for confirming the change output. Returns false if not valid.
+// verifies an output sends its funds to a given key index, belonging to this
+// wallet. Used for confirming the change output is actually sent back to the
+// wallet owner and not another wallet. Returns false if not valid.
 bool verify_change_output(tx_output_t output, uint8_t index) {
     // bip32 path for 44'/280'/0'/0/key_index
     uint8_t hash[20];
