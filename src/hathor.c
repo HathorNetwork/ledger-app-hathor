@@ -121,7 +121,7 @@ uint8_t* parse_output_value(uint8_t *in, size_t inlen, uint64_t *value) {
         tmp = U4BE(in, 0);
         buf += 4;
     }
-    os_memcpy(value, &tmp, 8);
+    *value = tmp;
     return buf;
 }
 
