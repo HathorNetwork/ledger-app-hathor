@@ -416,6 +416,76 @@ void sign_with_key(uint32_t key_index) {
     io_exchange_with_code(SW_OK, sig_size);
 }
 
+// receives data and adds to the buffer. Tries to parse an element from the buffer and
+// possibly displays it on screen
+void receive_data(uint8_t *data_buffer, uint16_t data_length, volatile unsigned int *flags) {
+    if (ctx->state == UNINITIALIZED) {
+        // starting new tx; not initialized yet
+        ctx->state = RECEIVING_DATA;
+        ctx->buffer_len = 0;
+        ctx->has_change_output = false;
+        ctx->change_output_index = 0;
+        ctx->change_key_index = 0;
+        ctx->current_output = 0;
+        ctx->display_index = 0;
+        ctx->sighash_all[0] = '\0';
+        cx_sha256_init(&ctx->sha256);
+
+        // the first chunk of data has the change output info
+        uint8_t offset = parse_change_output_info(data_buffer, data_length);
+
+        // copy all remaining bytes to hash
+        cx_hash(&ctx->sha256.header, 0, data_buffer + offset, data_length - offset, NULL, 0);
+
+        // also get length of tokens, inputs and outputs
+        assert_length(5, data_length - offset);    // version + remaining_tokens + remaining_inputs + outputs_len
+        //transaction->version = U2BE(data_buffer, offset);
+        offset += 2;
+        ctx->remaining_tokens = data_buffer[offset];
+        offset++;
+        ctx->remaining_inputs = data_buffer[offset];
+        offset++;
+        ctx->outputs_len = data_buffer[offset];
+        offset++;
+
+        // copy remaining bytes to decode buffer
+        ctx->buffer_len = data_length - offset;
+        os_memcpy(ctx->buffer, data_buffer + offset, ctx->buffer_len);
+    } else {
+        // add it to the hash
+        cx_hash(&ctx->sha256.header, 0, data_buffer, data_length, NULL, 0);
+
+        // copy to decode buffer
+        os_memcpy(ctx->buffer + ctx->buffer_len, data_buffer, data_length);
+        ctx->buffer_len += data_length;
+    }
+
+    // at this point, ctx->buffer has bytes to be decoded
+    switch(decode_next_element()) {
+        case TX_STATE_ERR:
+            io_exchange_with_code(SW_INVALID_PARAM, 0);
+            ui_idle();
+            break;
+        case TX_STATE_PARTIAL:
+            // We don't have enough data to decode the next element; send an
+            // OK code to request more.
+            THROW(SW_OK);
+        case TX_STATE_READY:
+            //display element
+            prepare_display_output(ctx->decoded_output);
+            UX_DISPLAY(ui_sign_tx_compare, ui_prepro_sign_tx_compare);
+            *flags |= IO_ASYNCH_REPLY;
+            return;
+        case TX_STATE_FINISHED:
+            // Go to confirmation screen
+            strcpy(ctx->line1, "Send");
+            strcpy(ctx->line2, "transaction?");
+            UX_DISPLAY(ui_sign_tx_confirm, ui_prepro_sign_tx_confirm);
+            *flags |= IO_ASYNCH_REPLY;
+            return;
+    }
+}
+
 void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_length, volatile unsigned int *flags, volatile unsigned int *tx) {
     if (p1 == 2) {
         // all done, go back to main menu
@@ -445,70 +515,6 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
             return;
         }
 
-        if (ctx->state == UNINITIALIZED) {
-            // starting new tx; not initialized yet
-            ctx->state = RECEIVING_DATA;
-            ctx->buffer_len = 0;
-            ctx->has_change_output = false;
-            ctx->change_output_index = 0;
-            ctx->change_key_index = 0;
-            ctx->current_output = 0;
-            ctx->display_index = 0;
-            ctx->sighash_all[0] = '\0';
-            cx_sha256_init(&ctx->sha256);
-
-            // the first chunk of data has the change output info
-            uint8_t offset = parse_change_output_info(data_buffer, data_length);
-
-            // copy all remaining bytes to hash
-            cx_hash(&ctx->sha256.header, 0, data_buffer + offset, data_length - offset, NULL, 0);
-
-            // also get length of tokens, inputs and outputs
-            assert_length(5, data_length - offset);    // version + remaining_tokens + remaining_inputs + outputs_len
-            //transaction->version = U2BE(data_buffer, offset);
-            offset += 2;
-            ctx->remaining_tokens = data_buffer[offset];
-            offset++;
-            ctx->remaining_inputs = data_buffer[offset];
-            offset++;
-            ctx->outputs_len = data_buffer[offset];
-            offset++;
-
-            // copy remaining bytes to decode buffer
-            ctx->buffer_len = data_length - offset;
-            os_memcpy(ctx->buffer, data_buffer + offset, ctx->buffer_len);
-        } else {
-            // add it to the hash
-            cx_hash(&ctx->sha256.header, 0, data_buffer, data_length, NULL, 0);
-
-            // copy to decode buffer
-            os_memcpy(ctx->buffer + ctx->buffer_len, data_buffer, data_length);
-            ctx->buffer_len += data_length;
-        }
-
-        // at this point, ctx->buffer has bytes to be decoded
-        switch(decode_next_element()) {
-            case TX_STATE_ERR:
-                io_exchange_with_code(SW_INVALID_PARAM, 0);
-                ui_idle();
-                break;
-            case TX_STATE_PARTIAL:
-                // We don't have enough data to decode the next element; send an
-                // OK code to request more.
-                THROW(SW_OK);
-            case TX_STATE_READY:
-                //display element
-                prepare_display_output(ctx->decoded_output);
-                UX_DISPLAY(ui_sign_tx_compare, ui_prepro_sign_tx_compare);
-                *flags |= IO_ASYNCH_REPLY;
-                return;
-            case TX_STATE_FINISHED:
-                // Go to confirmation screen
-                strcpy(ctx->line1, "Send");
-                strcpy(ctx->line2, "transaction?");
-                UX_DISPLAY(ui_sign_tx_confirm, ui_prepro_sign_tx_confirm);
-                *flags |= IO_ASYNCH_REPLY;
-                return;
-        }
+        receive_data(data_buffer, data_length, flags);
     }
 }
