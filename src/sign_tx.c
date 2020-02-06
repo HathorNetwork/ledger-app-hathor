@@ -241,7 +241,7 @@ static void prepare_display_output(tx_output_t output) {
             fake_output_index = ctx->decoded_output.index;
         }
     }
-    os_memmove(ctx->line1, "Output ", 7);
+    strcpy(ctx->line1, "Output ");
     itoa(fake_output_index, ctx->line1 + 7, 10);
     len = strlen(ctx->line1);
     ctx->line1[len++] = '/';
@@ -293,8 +293,8 @@ static unsigned int ui_sign_tx_confirm_button(unsigned int button_mask, unsigned
         case BUTTON_EVT_FAST | BUTTON_RIGHT: // confirm
             ctx->state = USER_APPROVED;
             io_exchange_with_code(SW_OK, 0);
-            os_memmove(ctx->line1, "Processing\0", 11);
-            os_memmove(ctx->line2, "...\0", 4);
+            strcpy(ctx->line1, "Processing");
+            strcpy(ctx->line2, "...");
             UX_REDISPLAY();
             break;
     }
@@ -381,8 +381,8 @@ static unsigned int ui_sign_tx_compare_button(unsigned int button_mask, unsigned
                     break;
                 case TX_STATE_FINISHED:
                     // Go to confirmation screen
-                    os_memmove(ctx->line1, "Send\0", 5);
-                    os_memmove(ctx->line2, "transaction?\0", 13);
+                    strcpy(ctx->line1, "Send");
+                    strcpy(ctx->line2, "transaction?");
                     UX_DISPLAY(ui_sign_tx_confirm, ui_prepro_sign_tx_confirm);
                     break;
             }
@@ -498,8 +498,8 @@ void handle_sign_tx(uint8_t p1, uint8_t p2, uint8_t *data_buffer, uint16_t data_
                 return;
             case TX_STATE_FINISHED:
                 // Go to confirmation screen
-                os_memmove(ctx->line1, "Send\0", 5);
-                os_memmove(ctx->line2, "transaction?\0", 13);
+                strcpy(ctx->line1, "Send");
+                strcpy(ctx->line2, "transaction?");
                 UX_DISPLAY(ui_sign_tx_confirm, ui_prepro_sign_tx_confirm);
                 *flags |= IO_ASYNCH_REPLY;
                 return;
