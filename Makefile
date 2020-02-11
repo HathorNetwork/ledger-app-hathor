@@ -30,10 +30,9 @@ APPNAME    = Hathor
 ICONNAME   = nanos_app_hathor.gif
 # APPVERSION has the format "X.Y.Z", where X, Y, and Z must be a single digit between 0 and 9
 APPVERSION = 0.0.1
+#P2PKH_VERSION_BYTE = 0x49	# testnet
+P2PKH_VERSION_BYTE = 0x28
 HATHOR_BIP44_CODE = 280
-P2PKH_VERSION_BYTE = 0x49
-#TODO change to mainnet byte
-#P2PKH_VERSION_BYTE = 0x28
 
 # The --path argument here restricts which BIP32 paths the app is allowed to derive.
 APP_LOAD_PARAMS = --appFlags 0x40 --path "44'/$(HATHOR_BIP44_CODE)'" --curve secp256k1 $(COMMON_LOAD_PARAMS)
@@ -58,8 +57,10 @@ DEFINES += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=7 IO_HID_EP_LENGTH=64
 DEFINES += APPVERSION=\"$(APPVERSION)\"
 DEFINES += P2PKH_VERSION_BYTE=$(P2PKH_VERSION_BYTE)
 DEFINES += HATHOR_BIP44_CODE=$(HATHOR_BIP44_CODE)
-# TODO remove
-DEFINES += HAVE_SPRINTF HAVE_PRINTF PRINTF=screen_printf
+
+# this enables the PRINTF macro, used for debugging
+# https://ledger.readthedocs.io/en/latest/userspace/debugging.html#printf-macro
+#DEFINES += HAVE_SPRINTF HAVE_PRINTF PRINTF=screen_printf
 
 ##############
 #  Compiler  #

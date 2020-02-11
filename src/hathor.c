@@ -5,63 +5,39 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 #include <os.h>
 #include <cx.h>
 #include "hathor.h"
-
-#define B58_MAX_INPUT_SIZE 120
+#include "util.h"
 
 // All keys that we derive start with path 44'/280'/0'
 // We make `| 0x80000000` for hardened keys
 const uint32_t htr_bip44[] = { 44 | 0x80000000, HATHOR_BIP44_CODE | 0x80000000, 0 | 0x80000000 };
 
-unsigned char const BASE58ALPHABET[] = {
-    '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F',
-    'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W',
-    'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'm',
-    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'};
-
-void bin2hex(uint8_t *dst, uint8_t *data, uint64_t inlen) {
-    static uint8_t const hex[] = "0123456789abcdef";
-    for (uint64_t i = 0; i < inlen; i++) {
-        dst[2*i+0] = hex[(data[i]>>4) & 0x0F];
-        dst[2*i+1] = hex[(data[i]>>0) & 0x0F];
-    }
-    dst[2*inlen] = '\0';
-}
-
-int bin2dec(uint8_t *dst, uint64_t n) {
-    if (n == 0) {
-        dst[0] = '0';
-        dst[1] = '\0';
-        return 1;
-    }
-    // determine final length
-    int len = 0;
-    for (uint64_t nn = n; nn != 0; nn /= 10) {
-        len++;
-    }
-    // write digits in big-endian order
-    for (int i = len-1; i >= 0; i--) {
-        dst[i] = (n % 10) + '0';
-        n /= 10;
-    }
-    dst[len] = '\0';
-    return len;
-}
-
 void derive_keypair(
-    uint32_t *path,
-    unsigned int path_len,
     cx_ecfp_private_key_t *private_key,
     cx_ecfp_public_key_t *public_key,
-    unsigned char *chain_code
+    unsigned char *chain_code,
+    int n_args,
+    ...
 ) {
     unsigned char private_component[32];
+    va_list ap;
+    int i;
+    uint32_t path[3 + n_args];
+    memcpy(path, htr_bip44, 3*sizeof(uint32_t));
 
-    os_perso_derive_node_bip32(CX_CURVE_256K1, path, path_len, private_component, chain_code);
+    va_start(ap, n_args);
+    for(i = 0; i < n_args; i++) {
+        path[3 + i] = va_arg(ap, int);
+    }
+    va_end(ap);
+
+    os_perso_derive_node_bip32(CX_CURVE_256K1, path, 3 + n_args, private_component, chain_code);
     cx_ecdsa_init_private_key(CX_CURVE_256K1, private_component, 32, private_key);
     cx_ecfp_generate_pair(CX_CURVE_256K1, public_key, private_key, 1);
 }
@@ -93,64 +69,113 @@ void compress_public_key(unsigned char *value) {
     value[0] = ((value[64] & 1) ? 0x03 : 0x02);
 }
 
-int encode_base58(const unsigned char *in, size_t inlen, unsigned char *out, size_t outlen) {
-    unsigned char buffer[B58_MAX_INPUT_SIZE * 138 / 100 + 1] = {0};
-    size_t i = 0, j;
-    size_t startAt, stopAt;
-    size_t zeroCount = 0;
-    size_t outputSize;
-
-    if (inlen > B58_MAX_INPUT_SIZE) {
-        return -1;
-    }
-
-    while ((zeroCount < inlen) && (in[zeroCount] == 0)) {
-        ++zeroCount;
-    }
-
-    outputSize = (inlen - zeroCount) * 138 / 100 + 1;
-    stopAt = outputSize - 1;
-    for (startAt = zeroCount; startAt < inlen; startAt++) {
-        int carry = in[startAt];
-        for (j = outputSize - 1; (int)j >= 0; j--) {
-            carry += 256 * buffer[j];
-            buffer[j] = carry % 58;
-            carry /= 58;
-
-            if (j <= stopAt - 1 && carry == 0) {
-                break;
-            }
-        }
-        stopAt = j;
-    }
-
-    j = 0;
-    while (j < outputSize && buffer[j] == 0) {
-        j += 1;
-    }
-
-    if (outlen < zeroCount + outputSize - j) {
-        return -1;
-    }
-
-    os_memset(out, BASE58ALPHABET[0], zeroCount);
-
-    i = zeroCount;
-    while (j < outputSize) {
-        out[i++] = BASE58ALPHABET[buffer[j++]];
-    }
-    return i;
+void pubkey_hash_to_address(uint8_t *hash, uint8_t *out) {
+    unsigned char checksum_buffer[32];
+    // prepend version
+    out[0] = P2PKH_VERSION_BYTE;
+    os_memmove(out+1, hash, 20);
+    // sha256d of above and get first 4 bytes (checksum)
+    sha256d(out, 21, checksum_buffer);
+    os_memmove(out+21, checksum_buffer, 4);
 }
 
 void pubkey_to_address(cx_ecfp_public_key_t *public_key, uint8_t *out) {
-    unsigned char checksumBuffer[32];
+    unsigned char hash_buffer[20];
     // get compressed pubkey
     compress_public_key(public_key->W);
     // get hash160
-    hash160(public_key->W, 33, out+1);
-    // prepend version
-    out[0] = P2PKH_VERSION_BYTE;
-    // sha256d of above and get first 4 bytes (checksum)
-    sha256d(out, 21, checksumBuffer);
-    os_memmove(out+21, checksumBuffer, 4);
+    hash160(public_key->W, 33, hash_buffer);
+    pubkey_hash_to_address(hash_buffer, out);
+}
+
+/**
+ * XXX considering only p2pkh, without timelock
+ * Validates that a script has the format of P2PKH. Throws an exception if doesn't.
+ * P2PKH scripts have the format:
+ *   [OP_DUP, OP_HASH160, pubkey_hash_len, pubkey_hash, OP_EQUALVERIFY, OP_CHECKSIG]
+ */
+void validate_p2pkh_script(uint8_t *in) {
+    // pubkey hashes have 20 bytes
+    uint8_t p2pkh[] = {OP_DUP, OP_HASH160, 20, OP_EQUALVERIFY, OP_CHECKSIG};
+    if (os_memcmp(p2pkh, in, 3) != 0 || os_memcmp(p2pkh + 3, in + 23, 2) !=0) {
+        THROW(SW_INVALID_PARAM);
+    }
+}
+
+/*
+ * Parses the output as either a 4 or 8-byte unsigned integer.
+ *
+ * Returns the position in buffer after parsing the value.
+ */
+uint8_t* parse_output_value(uint8_t *in, size_t inlen, uint64_t *value) {
+    uint8_t *buf = in;
+    uint64_t tmp = 0;
+    // if first bit is 1, it's 8 bytes long. Otherwise, it's 4
+    bool flag = ((0x80 & in[0]) ? true : false);
+    if (flag) {
+        assert_length(11, inlen);    // value + token_data + script_len
+        tmp = U8BE(in, 0);
+        tmp = (-1)*tmp;
+        buf += 8;
+    } else {
+        tmp = U4BE(in, 0);
+        buf += 4;
+    }
+    *value = tmp;
+    return buf;
+}
+
+/**
+ * Parses a tx output from the input data. Returns a pointer to the end of parsed data.
+ */
+uint8_t* parse_output(uint8_t *in, size_t inlen, tx_output_t *output) {
+    uint8_t *buf = in;
+    assert_length(7, inlen);    // value + token_data + script_len
+    buf = parse_output_value(buf, inlen, &output->value);
+    output->token_data = *buf;
+    buf++;
+    uint16_t script_len = U2BE(buf, 0);
+    buf += 2;
+    assert_length(script_len, inlen - 7);
+    validate_p2pkh_script(buf);
+    os_memcpy(output->pubkey_hash, buf+3, 20);
+    buf += script_len;
+    return buf;
+}
+
+void format_value(uint64_t value, unsigned char *out) {
+    // first deal with the part to the left of the decimal separator
+    uint64_t tmp = value / 100;
+    int c;
+    char buf[35];
+    char *p;
+
+    utoa(tmp, buf);
+    // 'c' is used here to control when a comma should be added
+    c = 2 - strlen(buf) % 3;
+    for (p = buf; *p != 0; p++) {
+       *out++ = *p;
+       if (c == 1) {
+           *out++ = ',';
+       }
+       c = (c + 1) % 3;
+    }
+    *--out = 0;
+
+    // now the part to the right of the decimal separator
+    tmp = value % 100;
+    // reusing 'c' variable to point to the end of string, to add decimal
+    // separator and possibly pad with 0
+    c = strlen((const char*)out);
+    out[c++] = '.';
+    if (tmp < 10) {
+        out[c++] = '0';
+    }
+    itoa(tmp, (char*)out + c, 10);
+}
+
+void assert_length(size_t smaller, size_t larger) {
+    if (smaller > larger) {
+        THROW(TX_STATE_PARTIAL);
+    }
 }

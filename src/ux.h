@@ -18,14 +18,57 @@ typedef struct {
     uint8_t displayIndex;
     // NULL-terminated string for display
     uint8_t partialAddress[MAX_SCREEN_LENGTH + 1];
-} getAddressContext_t;
+} get_address_context_t;
 
-// TODO not useful using union now but it will be when we add signTx command
+/**
+ * States have the following meanings:
+ * . uninitialized: signing process not strated yet;
+ * . receiving_data: already started the process and is receiving data;
+ * . user_approved: user approved sending this transaction;
+ */
+enum sign_tx_state_e {
+    UNINITIALIZED,
+    RECEIVING_DATA,
+    USER_APPROVED,
+};
+
+typedef struct {
+    enum sign_tx_state_e state;
+    // used for caching the bytes when receiving a partial element
+    uint8_t buffer[300];
+    // total size used in the buffer
+    uint16_t buffer_len;
+    // sha256 context for the hash
+    cx_sha256_t sha256;
+    uint8_t sighash_all[32];
+    // is there a change output in the tx? It there is, it won't be displayed to the user
+    bool has_change_output;
+    // on a given tx, which one is the change output (if it exists)
+    uint8_t change_output_index;
+    // which key the change is sent to
+    uint32_t change_key_index;
+    // tx info
+    uint8_t remaining_tokens;
+    uint8_t remaining_inputs;
+    uint8_t outputs_len;
+    // type of decoded element
+    uint8_t elem_type;
+    uint8_t current_output;
+    tx_output_t decoded_output;
+    // display variables
+    unsigned char info[70];     // address + HTR value
+    // the starting index to be shown on a scrolling line (line2 here)
+    uint8_t display_index;
+    // NULL-terminated string for display
+    char line1[15];
+    char line2[MAX_SCREEN_LENGTH + 1];
+} sign_tx_context_t;
+
 // To save memory, we store all the context types in a single global union,
 // taking advantage of the fact that only one command is executed at a time.
 typedef union {
-    getAddressContext_t getAddressContext;
-    //calcTxnHashContext_t calcTxnHashContext;
+    get_address_context_t get_address_context;
+    sign_tx_context_t sign_tx_context;
 } commandContext;
 extern commandContext global;
 
