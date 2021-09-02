@@ -1,3 +1,7 @@
+# This repo has been deprecated!
+
+Moved to https://github.com/HathorNetwork/hathor-ledger-app
+
 # ledger-app-hathor
 
 This is the official Hathor wallet app for the Ledger Nano S.
